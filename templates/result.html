@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Processing Complete</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page">
+        <section class="panel">
+            <p class="eyebrow">Processing Complete</p>
+            <h1>Your accounting files are ready</h1>
+            <p class="lede">
+                {{ result.output_rows }} accounting summary rows, {{ result.header_rows }} header rows, and {{ result.validation_rows }} validation rows were generated.
+            </p>
+
+            <div class="actions">
+                <a class="button-link" href="{{ url_for('download', filename=result.output_excel) }}">Download Excel output</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.output_csv) }}">Download Allocated Costs CSV</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.header_csv) }}">Download Header CSV</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.invoice_csv_bundle) }}">Download invoice CSV bundle</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.manual_style_csv_bundle) }}">Download manual-style CSV bundle</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.validation_excel) }}">Download validation report</a>
+                <a class="button-link" href="{{ url_for('download', filename=result.normalized_invoices_excel) }}">Download normalized invoices</a>
+            </div>
+
+            <h2>Pipeline log</h2>
+            <ul class="log-list">
+                {% for item in result.logs %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+
+            <a class="back-link" href="{{ url_for('index') }}">Process another batch</a>
+        </section>
+    </main>
+</body>
+</html>

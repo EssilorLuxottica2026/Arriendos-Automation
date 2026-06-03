@@ -1,0 +1,37 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local runtime and generated artifacts
+data/output/
+data/uploads/
+data/raw/
+data/normalized_inputs/
+data/standardized_workbooks/
+data/macro_export/
+scratch/
+support/media/
+
+# Legacy top-level folders that may still appear in old batches or exports
+output/
+uploads/
+normalized_inputs/
+standardized_workbooks/
+macro_export/
+PDFs/
+XMLs Arriendos/
+
+# Temporary files used during experiments
+tmp_*.xlsx
+tmp_*.xls
+tmp_*.xlsm
+tmp_*.csv
+
+# Common packaged artifacts
+*.zip
+*.log
+
+# OS noise
+.DS_Store
+Thumbs.db

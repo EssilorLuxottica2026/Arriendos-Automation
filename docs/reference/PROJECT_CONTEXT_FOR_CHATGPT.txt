@@ -1,0 +1,627 @@
+PROJECT CONTEXT - LEASE/RENT INVOICE AUTOMATION FOR LUCY/SAP
+
+1. HIGH-LEVEL PURPOSE
+
+This project automates the pre-accounting preparation work for lease/rent invoices in Colombia before the data is posted manually or automatically into Lucy/SAP.
+
+The main business objective is:
+- reduce manual effort in preparing lease/rent invoices
+- standardize invoice/accounting outputs
+- generate Lucy/SAP-ready files
+- minimize human intervention
+- avoid requiring the business user to manually add new headers or extra fields in the original source email/table
+
+The current automation scope is aligned to the SOP:
+- SOP-P2P-CO-PRO-003 Arrendamientos (Rentas) CO Rev3
+
+The project automates logic before final posting in Lucy/SAP, including:
+- information preparation and cleaning
+- mapping store/vendor/CECO
+- contract status checks
+- rent type determination (RF vs RV)
+- accounting account selection
+- VAT proration
+- invoice distribution/splitting rules
+- generation of consolidated outputs for downstream operations
+
+Out of scope:
+- posting directly in Lucy
+- posting directly in SAP
+- SAP tax/withholding validation inside SAP itself
+- SAP compensation steps such as F-44
+
+
+2. CURRENT TECHNICAL STACK
+
+Language/runtime:
+- Python
+
+Main libraries:
+- Flask
+- pandas
+- numpy
+- openpyxl
+- xlrd
+- pypdf
+
+Web app:
+- Flask app serving an upload form and download links
+
+Current requirements.txt:
+- flask>=3.0.0
+- pandas>=2.2.0
+- numpy>=1.26.0
+- openpyxl>=3.1.0
+- xlrd>=2.0.1
+- pypdf>=5.0.0
+
+
+3. REPOSITORY / PROJECT STRUCTURE
+
+Relevant files/folders:
+- app.py
+- pipeline/processor.py
+- pipeline/pdf_reader.py
+- templates/
+- static/
+- uploads/
+- output/
+- normalized_inputs/
+- standardized_workbooks/
+- macro_export/
+- README.md
+- SOP_SCOPE.md
+- generate_business_validation_template.py
+- BUSINESS_VALIDATION_TEMPLATE_GUIDE.md
+- business_validation_template.xlsx
+- normalize_source_workbooks.py
+- standardize_macro_workbook.py
+
+Purpose of the main files:
+
+app.py
+- Flask entrypoint
+- accepts uploads from the user
+- saves uploaded files
+- runs the processing pipeline
+- renders result page
+- exposes download endpoint for generated files
+
+pipeline/processor.py
+- core business/data pipeline
+- loads all reference/input files
+- cleans and standardizes them
+- merges invoices with reference tables
+- applies business rules
+- generates final outputs for Lucy/SAP-oriented downstream use
+
+pipeline/pdf_reader.py
+- parses PDF invoices using pypdf
+- extracts best-effort fields from PDFs
+- intended as enrichment/fallback for invoices file data
+
+generate_business_validation_template.py
+- creates a business-facing workbook to validate real business rules
+- used to gather definitive process rules from business owners
+
+
+4. CURRENT APP / USER FLOW
+
+The current web app process is:
+
+1. User opens Flask web app
+2. User uploads required files
+3. User optionally uploads:
+   - historical file
+   - macro workbook template
+   - invoice PDF files
+4. User optionally specifies accounting period
+5. App calls LeaseAccountingPipeline.run(...)
+6. Pipeline reads, cleans, merges, applies rules
+7. App generates downloadable outputs
+
+Current upload requirements from app.py:
+- control_file
+- contracts_file
+- prorateo_file
+- distribution_file
+- invoices_file
+
+Optional:
+- history_file
+- macro_workbook_file
+- invoice_pdf_files (multiple PDFs)
+
+Allowed upload extensions currently accepted by the web app:
+- .xlsx
+- .xls
+- .xlsm
+- .csv
+
+
+5. REQUIRED SOURCE FILES AND THEIR ROLE
+
+The pipeline currently expects these source files:
+
+A. Invoices file
+- extensions: xlsx / xls / csv
+- represents raw invoice-level data
+- this is the main invoice input table for the pipeline
+
+The pipeline uses flexible header detection, but at minimum it expects the concepts:
+- invoice_id
+- vendor
+- total
+
+It can also consume if present:
+- store
+- reference
+- vat
+- invoice_date
+- due_date
+- ceco
+- withholding_tax
+- payment_terms_text
+- item_count_hint
+
+Important code fact:
+- in pipeline/processor.py, _load_invoices() only hard-requires:
+  - invoice_id
+  - vendor
+  - total
+
+However, for a stronger accounting result, these are highly recommended:
+- invoice_date
+- vat
+- due_date
+
+B. CONTROL ARRI ADMON.xlsx
+- reference file
+- used to map store/vendor/CECO relations
+
+C. Contratos con condiciones.xlsx
+- reference file
+- used to determine contract validity, end_of_term, rent_min, status_en_rem
+
+D. PRORATEO.xlsx
+- reference file
+- used to determine VAT proration percentages (vw_percent)
+
+E. Cuadro de distribucion 2023.xls
+- reference file
+- used for vendor distribution rules and split cases (e.g. 33%, 50%, multiple postings)
+
+F. FACTURAS CONTABILIZADAS ARRIENDOS.xlsx (optional)
+- historical reference
+
+G. Macro workbook template (optional)
+- used to enrich Lucy export / macro-oriented outputs
+
+H. PDF invoice files (optional but increasingly important)
+- used by pipeline/pdf_reader.py
+- intended to enrich/fill missing invoice data when the invoices spreadsheet is incomplete or inconsistent
+
+
+6. CORE BUSINESS LOGIC IN THE PYTHON PIPELINE
+
+6.1 Invoice loading and standardization
+
+The pipeline:
+- normalizes incoming column names
+- cleans text fields
+- creates missing optional columns as None if absent
+- converts dates to pandas datetime
+- converts numerics (total, vat, withholding_tax, etc.)
+- normalizes invoice_id
+- normalizes vendor as numeric code when possible
+
+The pipeline also computes:
+- amount = total - vat
+
+Key invoice columns after normalization:
+- invoice_id
+- vendor
+- store
+- reference
+- total
+- vat
+- invoice_date
+- due_date
+- ceco
+- withholding_tax
+- payment_terms_text
+- item_count_hint
+- amount
+
+
+6.2 PDF enrichment logic
+
+If PDF invoice files are provided, pipeline/pdf_reader.py parses them and tries to extract:
+- source_file
+- invoice_id
+- invoice_date
+- due_date
+- subtotal
+- total
+- detected_iva
+- withholding_tax
+- payment_terms_text
+- item_count_hint
+- has_zero_iva_hint
+- text_excerpt
+- flags
+
+The processor then merges PDF-derived values back into invoices using normalized invoice_id matching:
+- fills invoice_date if missing
+- fills due_date if missing
+- fills vat if missing or zero
+- fills total if missing or zero
+- fills withholding_tax if missing
+- fills payment_terms_text if missing
+- fills item_count_hint if missing
+- recalculates amount using pdf_subtotal first if available
+
+This means PDF extraction is currently an enrichment/fallback layer, not the only source of truth.
+
+
+6.3 Merge with reference tables
+
+The pipeline merges invoices with:
+- CONTROL mappings
+- PRORATEO mappings
+- contracts data
+- optional macro database
+
+It produces:
+- mapped_vendor
+- mapped_store
+- mapped_ceco
+- mapped_ceco_key
+- profit_center
+- end_of_term
+- rent_min
+- status_en_rem
+- vw_percent
+
+
+6.4 Accounting/business rules
+
+The pipeline determines:
+- contract_active = whether end_of_term >= invoice_date
+- rent_type = RF if contract active, otherwise RV
+- account:
+  - RF -> fixed account 1245150017
+  - RV -> variable account 1537210004
+
+It calculates:
+- vat_total
+- vat_vw
+- vat_vq
+- withholding_tax_amount
+- invoice_total
+
+It also builds:
+- standardized accounting text
+- validations report
+- invoice distribution splits when needed
+
+
+6.5 Distribution / split logic
+
+The pipeline supports special distribution cases from the distribution file.
+
+It can split one invoice into multiple target vendors/postings and proportionally distribute:
+- amount
+- invoice_total
+- vat_total
+- vat_vw
+- vat_vq
+- withholding_tax_amount
+
+This is a key business rule area because some invoices do not become a single posting.
+
+
+7. CURRENT OUTPUTS PRODUCED BY THE PIPELINE
+
+The pipeline writes:
+
+1. Timestamped main workbook:
+- output_lucy_ready_<timestamp>.xlsx
+
+2. Fixed-name workbook:
+- output_lucy_ready.xlsx
+
+3. Lucy export CSV:
+- output_lucy_ready_<timestamp>.csv
+
+4. Header CSV:
+- output_lucy_headers_<timestamp>.csv
+
+5. Per-invoice CSV bundle ZIP:
+- output_invoice_csv_bundle_<timestamp>.zip
+
+6. Validation workbook:
+- output_validations_<timestamp>.xlsx
+
+7. Normalized invoices snapshot:
+- normalized_invoices_<timestamp>.xlsx
+
+Important worksheet/output views:
+- summary
+- lucy_header_export
+- lucy_headers
+- lucy_lines
+- lucy_export
+- lucy_mapping
+- lucy_header_matrix
+
+
+8. FIELDS THE CURRENT PYTHON PIPELINE REALLY NEEDS
+
+Very important for design decisions:
+
+The pipeline does NOT need every possible invoice field to load.
+
+Current hard minimum to avoid load failure:
+- invoice_id
+- vendor
+- total
+
+Strongly recommended for meaningful accounting output:
+- invoice_date
+- vat
+- due_date
+
+Useful but not strictly mandatory:
+- withholding_tax
+- payment_terms_text
+- item_count_hint
+
+Fields that are currently useful for audit/debugging but not required by the core crossing logic:
+- source_pdf_name
+- raw_extracted_text
+- vendor_name
+- vendor_tax_id
+- subtotal
+- currency
+- line_items_text
+- confidence_score
+
+Critical nuance:
+- the pipeline expects vendor primarily as a code/NIT/acreedor-like identifier, not just a free-form vendor name
+
+
+9. CURRENT PDF EXTRACTION / OCR REALITY
+
+The project owner/user tested PDF extraction through Power Automate using AI Builder OCR.
+
+Observed reality:
+- PDFs come in many different layouts
+- at least 3 provided PDFs already differ significantly
+- there may be ~300 different PDF formats in total
+- therefore it is not realistic to hand-map each PDF layout in Python or Power Automate
+
+The original desire is:
+- avoid requiring the human who prepares the original source table/email to add new headers manually
+- avoid pushing extra manual work back to the business user
+- reduce manual effort as much as possible
+- find an approach that can extract fields from highly heterogeneous PDFs with high accuracy
+
+
+10. POWER AUTOMATE EXPERIMENTS ALREADY DONE
+
+Power Automate was tested as an alternative/external extraction route.
+
+What was tried:
+- manual trigger with file upload
+- AI Builder OCR action: "Recognize text in an image or a PDF document"
+- Excel action: "Add a row into a table"
+
+Initial issues encountered:
+- AI Builder environment/credit limitations
+- incorrect mapping where the file name was accidentally sent instead of contentBytes
+
+That was corrected.
+
+Confirmed working pieces:
+- manual trigger receives PDF content correctly
+- OCR action can extract full document text
+- a "Redactar" (Compose/Compose-like) action was added
+- Excel insertion works
+
+Confirmed columns successfully written by the Power Automate prototype:
+- source_pdf_name
+- raw_extracted_text
+
+Example from a successful OCR run:
+- source_pdf_name: "T081 ADMINISTRACION ABRIL  2026.pdf"
+- raw_extracted_text: full OCR output from the PDF
+
+
+11. WHY THE CURRENT POWER AUTOMATE PARSING APPROACH IS NOT THE FINAL SOLUTION
+
+The Power Automate prototype then attempted to fill columns such as:
+- invoice_id
+- invoice_date
+- due_date
+- vendor_name or vendor
+- subtotal
+- invoice_total
+- payment_terms
+
+This was done using fragile text expressions like:
+- split(...)
+- first(...)
+- trim(...)
+
+This approach worked for one PDF layout but failed on a different PDF layout with errors like:
+- array index out of bounds
+- expected marker text not found
+
+This confirms:
+- OCR + hardcoded text splitting is layout-dependent
+- it does not scale to ~300 heterogeneous PDF formats
+- it is essentially re-implementing manual parsing logic inside Power Automate
+
+In other words:
+- it is not real multiformat document intelligence
+- it is not true generalizable machine learning
+- it is fragile rule-based parsing on top of OCR
+
+
+12. THE REAL PROBLEM TO SOLVE
+
+The actual problem is NOT:
+- how to hardcode one PDF layout
+- how to split text for one supplier
+
+The actual problem is:
+
+"How to reliably extract the key invoice/accounting fields from a very large and heterogeneous set of PDF invoice layouts, without requiring manual header enrichment in the original source files, and without maintaining hundreds of layout-specific parsing rules in either Python or Power Automate?"
+
+This is the central design problem.
+
+
+13. THE TARGET FIELDS OF INTEREST
+
+The team has been experimenting with a normalized extraction schema similar to:
+- source_pdf_name
+- invoice_id
+- invoice_date
+- due_date
+- vendor_name
+- vendor_tax_id
+- subtotal
+- vat_total
+- withholding_tax_amount
+- invoice_total
+- payment_terms
+- currency
+- line_items_text
+- item_count
+- confidence_score
+- raw_extracted_text
+
+However, from the pipeline perspective, the most important normalized fields are closer to:
+- invoice_id
+- vendor
+- total
+- vat
+- invoice_date
+- due_date
+- withholding_tax
+- payment_terms_text
+- item_count_hint
+
+
+14. WHAT HAS ALREADY BEEN PROVEN TECHNICALLY
+
+The following has already been proven:
+
+1. The Python pipeline runs end to end
+2. The pipeline can read Excel/CSV inputs and generate Lucy-oriented outputs
+3. PDF parsing via pypdf can extract some useful fields from some PDFs
+4. Power Automate can receive PDFs
+5. AI Builder OCR can extract full text
+6. Power Automate can write extraction output into Excel
+
+So the current blocker is no longer:
+- file transport
+- file upload
+- Excel writeback
+
+The current blocker is specifically:
+- how to obtain the right fields robustly from many different PDF formats
+
+
+15. WHAT IS NOT DESIRED
+
+The business/user does NOT want a solution that depends on:
+- manually adding more headers to the original source email/table
+- manually editing every invoice spreadsheet before processing
+- maintaining 300 per-layout parsing rules
+- moving work back to a person instead of reducing effort
+
+
+16. WHAT KIND OF SOLUTION IS BEING SOUGHT
+
+The desired solution is something closer to:
+- machine learning / document intelligence / LLM-based extraction
+- highly adaptable to many invoice layouts
+- high-accuracy extraction of a normalized set of fields
+- minimal manual maintenance
+- minimal burden on business users
+
+Potential architecture directions already under discussion include:
+- AI Builder "Process documents"
+- AI Builder / GPT prompt-based extraction
+- OCR + LLM structured JSON extraction
+- Azure Document Intelligence or similar
+- using Power Automate only as an orchestrator while Python or an external service performs the intelligent extraction
+
+
+17. IMPORTANT CONSTRAINTS FOR ANY PROPOSED SOLUTION
+
+Any proposed solution should respect these constraints:
+
+1. There may be around 300 invoice PDF formats
+2. PDFs differ significantly in structure and labels
+3. The original upstream source should NOT require new manual headers added by humans
+4. The solution should reduce business effort, not move the burden upstream
+5. The current Python pipeline should remain usable if possible
+6. A normalized field schema is desirable
+7. Some extracted fields may still need confidence-based human review
+8. The most important system quality is maintainability at scale, not just solving one PDF
+
+
+18. CURRENT BUSINESS VALIDATION ASSETS
+
+The project already contains a business validation workbook to clarify the real rules:
+- business_validation_template.xlsx
+
+It includes sheets such as:
+- instructions
+- header fields
+- allocated costs
+- distribution
+- PDF formats
+- real cases
+- blocking rules
+- open questions
+
+This exists because many business rules are still ambiguous or undocumented.
+
+This means any proposed extraction solution should consider:
+- there is still uncertainty in the true business rules
+- extraction accuracy alone is not enough; output must align with posting/business logic
+
+
+19. WHAT A GOOD PROPOSAL FROM CHATGPT SHOULD ADDRESS
+
+A useful proposal should answer:
+
+1. What is the best extraction architecture for ~300 heterogeneous PDF formats?
+2. Is Power Automate + AI Builder enough, or should Power Automate only orchestrate?
+3. Should the Python project remain the "brain" and Power Automate only collect files?
+4. Would OCR + LLM JSON extraction be more scalable than AI Builder-only?
+5. How should confidence, validation, and human review be handled?
+6. What fields should be mandatory vs optional?
+7. How should the extracted schema map back into the current Python pipeline?
+8. What is the minimum viable solution vs the production-grade architecture?
+9. How can the solution avoid requiring users to modify the original source email/table?
+10. What is the best way to support future unseen PDF layouts without hand-mapping?
+
+
+20. REQUEST TO CHATGPT
+
+Given all the context above, propose the best practical and maintainable architecture to extract the needed invoice/accounting fields from highly heterogeneous lease/rent PDF invoices with minimal manual maintenance and without requiring upstream business users to add new headers to the original source tables/emails.
+
+The answer should preferably include:
+- recommended architecture
+- recommended Microsoft-only option
+- recommended hybrid option (Power Automate + Python/LLM)
+- tradeoffs
+- implementation steps
+- fallback/error-review strategy
+- how to integrate with the current pipeline and output expectations
+

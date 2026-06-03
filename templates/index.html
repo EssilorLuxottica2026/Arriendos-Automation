@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lease Accounting Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page">
+        <section class="panel hero">
+            <p class="eyebrow">Lease Accounting Automation</p>
+            <h1>Upload the files and generate the Lucy/SAP-ready output</h1>
+            <p class="lede">
+                This app reads lease invoice data, enriches it with the reference workbooks,
+                calculates VAT splits, applies vendor distributions, and exports a ready-to-use accounting file.
+            </p>
+            <p class="lede">
+                Scope aligned with SOP `Arrendamientos - Facturas Manuales`: automate preparation, validation,
+                contract review, VAT proration, account determination, and consolidated output generation before posting.
+            </p>
+        </section>
+
+        <section class="panel">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alerts">
+                        {% for message in messages %}
+                            <div class="alert">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('process') }}" method="post" enctype="multipart/form-data" class="upload-form">
+                <div class="grid">
+                    <label>
+                        <span>Invoices file from email</span>
+                        <input type="file" name="invoices_file" accept=".xlsx,.xls,.csv" required>
+                    </label>
+                    <label>
+                        <span>CONTROL ARRI ADMON</span>
+                        <input type="file" name="control_file" accept=".xlsx,.xls" required>
+                    </label>
+                    <label>
+                        <span>Contratos con condiciones</span>
+                        <input type="file" name="contracts_file" accept=".xlsx,.xls" required>
+                    </label>
+                    <label>
+                        <span>PRORATEO</span>
+                        <input type="file" name="prorateo_file" accept=".xlsx,.xls" required>
+                    </label>
+                    <label>
+                        <span>Cuadro de distribucion</span>
+                        <input type="file" name="distribution_file" accept=".xlsx,.xls" required>
+                    </label>
+                    <label>
+                        <span>FACTURAS CONTABILIZADAS (optional)</span>
+                        <input type="file" name="history_file" accept=".xlsx,.xls,.xlsm,.csv">
+                    </label>
+                    <label>
+                        <span>Macro workbook reference (optional)</span>
+                        <input type="file" name="macro_workbook_file" accept=".xlsm,.xlsx,.xls">
+                    </label>
+                    <label>
+                        <span>Invoice support files PDF/XML (optional)</span>
+                        <input type="file" name="invoice_support_files" accept=".pdf,.xml" multiple>
+                    </label>
+                    <label>
+                        <span>Period `MM-YYYY`</span>
+                        <input type="text" name="period" placeholder="03-2026">
+                    </label>
+                </div>
+
+                <div class="helper">
+                    The app accepts the raw invoice Excel as received by email. It will normalize fields like
+                    `store`, `ceco`, `invoice_id`, `vendor`, and `total` internally before crossing them with the
+                    support workbooks and PDFs.
+                </div>
+
+                <div class="helper">
+                    This app does not post into Lucy/SAP, validate retentions in SAP, or execute compensations like `F-44`.
+                    It prepares the accounting-ready file for manual operation or future RPA.
+                </div>
+
+                <div class="helper">
+                    When available, upload invoice PDFs or XML electronic invoices as support files. The app will try to extract
+                    `invoice_id`, `invoice_date`, `due_date`, subtotal, total, IVA, payment terms, and item counts to enrich the `Invoices file`.
+                </div>
+
+                <div class="helper">
+                    If you upload the macro workbook, the app will use its `lucy` sheet as the reference layout for
+                    the final CSV export, so the output stays as close as possible to the file the team already uses.
+                </div>
+
+                <button type="submit">Process files</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

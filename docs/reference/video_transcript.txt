@@ -1,0 +1,1219 @@
+[   10.61 -    23.22] cuando nos manda un correo
+[   23.22 -    26.28] electrónico, cuando nos manda
+[   26.28 -    30.12] un correo electrónico con un
+[   30.12 -    35.10] listado de de las ventas que
+[   35.10 -    48.60] tienen que retiradas a de las
+[   48.60 -    58.42] facturas.
+[   58.42 -    61.42] Y Camargo lo manda.
+[   61.42 -    64.42] No siempre nos manda nuestro
+[   64.42 -    67.42] correo personal, sino al del
+[   67.42 -    69.42] correo compartido que tenemos
+[   69.42 -    72.42] que facturas con tu electrónica
+[   72.42 -    75.42] de Colombia, o sea, te voy a hacer
+[   75.42 -    77.42] referencia a las primeras dos
+[   77.42 -    80.42] letras de Colombia.
+[   80.42 -    83.42] Y nos ingresamos a este correo
+[   83.42 -    89.97] y aquí nos encontramos.
+[   89.97 -    91.97] Este es el tipo de correo
+[   91.97 -    94.97] que ya nos manda, que en el
+[   94.97 -    96.97] cuerpo del correo nos pone una
+[   96.97 -    98.97] tablita, esta tablita si es
+[   98.97 -   100.97] necesario se puede modificar, o
+[  100.97 -   102.97] sea, son los que nos permiten,
+[  102.97 -   104.97] son los que nos permiten,
+[  104.97 -   106.97] o sea, que se modifiquen a la
+[  106.97 -   108.97] tienda a la que pertenece cada
+[  108.97 -   110.97] factura, en TECO, aunque debe
+[  110.97 -   112.97] estar registrada la factura, el
+[  112.97 -   114.97] Vendor, el nombre del proveedor,
+[  114.97 -   116.97] el NIC, y el número de la
+[  116.97 -   118.97] factura. Entonces, nos responde
+[  118.97 -   120.97] en un número de factura,
+[  120.97 -   122.97] obviamente, porque este correo
+[  122.97 -   124.97] también va dirigido a luz.
+[  124.97 -   126.97] Nos pone las facturas y
+[  126.97 -   128.97] que tiene el PDF
+[  128.97 -   130.97] y el MCCM
+[  130.97 -   132.97] que tienen, porque no toda
+[  132.97 -   133.97] es
+[  133.97 -   135.97] una facturación electrónica
+[  135.97 -   137.97] hacia Colombia.
+[  137.97 -   139.97] A veces solamente son
+[  139.97 -   141.97] como un
+[  141.97 -   143.97] board, o sea,
+[  143.97 -   145.97] donde pone el arrendador,
+[  145.97 -   147.97] se cobró tanto, o sea, por
+[  147.97 -   149.97] ejemplo, como una
+[  149.97 -   151.97] relación así multiple
+[  151.97 -   153.97] en un board, que se llama
+[  153.97 -   155.97] cuentas de cobro, pero la
+[  155.97 -   157.97] mayoría cuenta con un PDF
+[  157.97 -   159.97] un poquito como más
+[  159.97 -   161.97] formato, podría decir, o sea,
+[  161.97 -   163.97] con un formato un poquito
+[  163.97 -   165.97] más
+[  165.97 -   167.97] acercado a lo que es una factura,
+[  167.97 -   169.97] aunque no contiene el
+[  169.97 -   171.97] XML en mucho de las ocasiones.
+[  171.97 -   173.97] Entonces, con este formato
+[  173.97 -   175.97] de factura, pues, yo puedo ir a
+[  175.97 -   177.97] acá, a luz,
+[  177.97 -   179.97] en Interactive, o
+[  179.97 -   181.97] en Validation, porque la mayoría
+[  181.97 -   183.97] de eso es como no tiene XML,
+[  183.97 -   185.97] es mucho así que lleguen directo
+[  185.97 -   187.97] a Validation.
+[  187.97 -   189.97] Entonces, pues ahí,
+[  189.97 -   191.97] es donde hay que hacer, pues lo paso,
+[  191.97 -   193.97] primero buscarlo aquí en Validation
+[  193.97 -   195.97] y pues poner los datos que no le
+[  195.97 -   197.97] alcanzó a leer la guía, que suelen
+[  197.97 -   199.97] ser el vendo por resto
+[  199.97 -   201.97] porque también en cada factura
+[  201.97 -   203.97] hay algunas que
+[  203.97 -   205.97] pueden contener
+[  205.97 -   207.97] hasta seis números diferentes
+[  207.97 -   209.97] de proveedores
+[  209.97 -   211.97] y en base a
+[  211.97 -   213.97] el contrato, esto se determina
+[  213.97 -   215.97] qué vendo hay que ponerlo.
+[  215.97 -   217.97] Entonces, este tipo
+[  217.97 -   219.97] de factura, siempre que quedan aquí en Validation,
+[  219.97 -   221.97] entonces hay que cambiarle lo que es
+[  221.97 -   223.97] el vendo, hay que cambiarle lo que
+[  223.97 -   225.97] es el
+[  225.97 -   227.97] que lo obliga.
+[  229.97 -   231.97] Les tengo que cambiarlos de vendo,
+[  231.97 -   233.97] hay que cambiarlo que es documental.
+[  233.97 -   235.97] El tipo
+[  235.97 -   237.97] de movimiento se empezó a feir.
+[  239.97 -   241.97] Le digo el vendo code, porque aunque le
+[  241.97 -   243.97] ponga el nombre
+[  243.97 -   245.97] del vendo,
+[  245.97 -   247.97] en muchas ocasiones, como el comento
+[  247.97 -   249.97] hay
+[  249.97 -   251.97] opciones diferentes de número de vendo
+[  251.97 -   253.97] y
+[  253.97 -   255.97] no es común
+[  255.97 -   257.97] que le lea correctamente
+[  257.97 -   259.97] el día de
+[  259.97 -   261.97] la factura
+[  261.97 -   263.97] o a veces también
+[  263.97 -   265.97] el invoice number
+[  265.97 -   267.97] que cuando esto pasa
+[  267.97 -   269.97] es más complicado
+[  269.97 -   271.97] el producto llegará
+[  271.97 -   273.97] ubicar la factura en Validation
+[  273.97 -   275.97] porque es que está completamente
+[  275.97 -   277.97] privatía.
+[  277.97 -   279.97] En Validation no tengo mucho modo
+[  279.97 -   281.97] de filtrarlo,
+[  281.97 -   283.97] por lo que lo hemos filtrado más
+[  283.97 -   285.97] es por el asunto del correo.
+[  285.97 -   287.97] Hay una columna de los filtros
+[  287.97 -   289.97] que podemos utilizar,
+[  289.97 -   291.97] que lo tengo un poco más prácticas,
+[  291.97 -   293.97] que es el minecube.
+[  293.97 -   295.97] A veces
+[  295.97 -   297.97] solamente con el minecube
+[  297.97 -   299.97] lo podemos encontrar.
+[  299.97 -   301.97] Y colocándole por los datos
+[  301.97 -   303.97] la Validación, porque por lo regular
+[  303.97 -   305.97] estas facturas que reciben
+[  305.97 -   307.97] entre
+[  307.97 -   309.97] martes y miércoles
+[  309.97 -   311.97] y se supone que hasta el día
+[  311.97 -   313.97] de miércoles se hubo que enviarla
+[  313.97 -   315.97] a Proposéfago ya con la factura
+[  315.97 -   317.97] por lo que
+[  317.97 -   319.97] siempre con prioridad
+[  319.97 -   321.97] se preburgen.
+[  321.97 -   323.97] Una vez estando
+[  323.97 -   325.97] en Interactive, o sea, cuando ya
+[  325.97 -   327.97] la Validación 1 pues
+[  327.97 -   329.97] bajamos en los 20-30 minutos
+[  329.97 -   331.97] a lo mucho de una hora
+[  331.97 -   333.97] y ya me apareció en Interactive
+[  333.97 -   335.97] para
+[  335.97 -   337.97] poderlo registrar.
+[  337.97 -   339.97] Y como les comento, os puedo filtrar
+[  339.97 -   341.97] por el polio de la factura
+[  341.97 -   343.97] o por el proveedor
+[  343.97 -   345.97] o demás para poderlas encontrar
+[  345.97 -   347.97] por el minecube.
+[  347.97 -   349.97] Lo que hizo la factura
+[  349.97 -   351.97] y la abro
+[  351.97 -   353.97] en este caso
+[  353.97 -   355.97] digamos que usted es un proveedor
+[  355.97 -   357.97] de
+[  357.97 -   359.97] Terrento.
+[  359.97 -   363.73] Voy a buscar acá
+[  363.73 -   365.73] la factura, la tienda
+[  365.73 -   367.73] que corresponde
+[  367.73 -   369.73] en este caso
+[  369.73 -   371.73] va a ser un poquito como que al revés
+[  371.73 -   373.73] o sea no partiendo de
+[  373.73 -   375.73] el estado de la factura
+[  375.73 -   377.73] que hago acá en Interactive
+[  377.73 -   379.73] busco este polio
+[  379.73 -   381.73] en mis correos
+[  381.73 -   383.73] que tengo que encontrar
+[  383.73 -   385.73] aquí, por ejemplo, sería esta
+[  385.73 -   387.73] factura.
+[  387.73 -   389.73] Bueno, voy a estar en cinta grande.
+[  389.73 -   391.73] Aquí me hacen
+[  391.73 -   393.73] la atención de esta factura
+[  393.73 -   395.73] y me dicen que es de la tienda 025
+[  395.73 -   397.73] y que va a haber registrada
+[  397.73 -   399.73] este efecto.
+[  399.73 -   401.73] Entonces, yo voy a buscar esta
+[  401.73 -   403.73] tienda 025
+[  403.73 -   405.73] que aquí tengo
+[  405.73 -   407.73] mi
+[  407.73 -   409.73] actual excel en los que nos basamos
+[  409.73 -   411.73] en la tienda.
+[  411.73 -   413.73] Siempre que te llega
+[  413.73 -   415.73] por ejemplo, ese listado
+[  415.73 -   417.73] grandote, toda la información
+[  417.73 -   419.73] siempre va a venir ahí o a veces
+[  419.73 -   421.73] de que, uy, pues no sé, ciertas situaciones
+[  421.73 -   423.73] en las que falta uno
+[  423.73 -   425.73] y luego tienes que ir a preguntar
+[  425.73 -   427.73] o tienes que ir a buscarlo a algún lado
+[  427.73 -   431.26] o siempre la encuentres ahí.
+[  431.26 -   433.26] En este caso, siempre aquí
+[  433.26 -   435.26] pero si utilizan aquí
+[  435.26 -   437.26] verán todos los rendos que compien
+[  437.26 -   439.26] compiene
+[  439.26 -   441.26] este sonbendo
+[  441.26 -   443.26] este sonbendo
+[  443.26 -   445.26] 3-4 rendos
+[  445.26 -   447.26] ¿Qué significa eso?
+[  447.26 -   449.26] Esta factura en particular
+[  449.26 -   451.26] y
+[  451.26 -   453.26] 025A
+[  453.26 -   455.26] tiene que ser una tienda 025
+[  455.26 -   457.26] esta tiene
+[  457.26 -   459.26] que ser registrada
+[  459.26 -   461.26] otra digamos
+[  461.26 -   463.26] eso es 20.000
+[  463.26 -   465.26] 20 millones ¿verdad?
+[  465.26 -   467.26] el 33%
+[  467.26 -   469.26] de esta factura debe ir registrado
+[  469.26 -   471.26] a un bendo
+[  471.26 -   473.26] el 33% de esta factura
+[  473.26 -   475.26] debe ir registrado a otro bendo
+[  475.26 -   477.26] y aquí otra
+[  477.26 -   480.86] 3 veces se tiene que postear esta factura
+[  480.86 -   482.86] Entonces, ¿qué es lo que yo hago con esta factura?
+[  482.86 -   484.86] pues la altivo
+[  484.86 -   486.86] para que me pueda parecer
+[  486.86 -   488.86] en este
+[  488.86 -   490.86] lo que yo hago
+[  490.86 -   492.86] aquí
+[  492.86 -   494.86] me voy a litigation
+[  494.86 -   496.86] guardo el barco
+[  496.86 -   498.86] si no la voy a poder encontrar
+[  498.86 -   500.86] y esto
+[  500.86 -   502.86] me voy a litigation
+[  502.86 -   506.18] act sheet
+[  506.18 -   508.18] compiendo otra labor
+[  508.18 -   510.18] y la recupero acá
+[  510.18 -   512.18] en
+[  512.18 -   514.18] CDS
+[  514.18 -   516.18] citando por el barco que guardo
+[  516.18 -   518.18] de esta factura
+[  518.18 -   520.18] entonces la tomo
+[  520.18 -   522.18] y como ya sé que voy a hacer 3 por 2
+[  522.18 -   524.18] voy a revertar
+[  524.18 -   526.18] la 3 veces por si de alguna manera
+[  526.18 -   528.18] de
+[  528.18 -   530.18] aquí en repos
+[  530.18 -   532.18] repos una vez
+[  532.18 -   544.74] esperamos
+[  544.74 -   546.74] luego repos otra vez
+[  546.74 -   556.10] esperamos
+[  556.10 -   571.28] y la temporal
+[  571.28 -   573.28] ahí está
+[  573.28 -   575.28] entonces yo busco acá por el color
+[  575.28 -   577.28] de barcos
+[  577.28 -   579.28] pero es refresco que todo lo acabo de hacer
+[  579.28 -   581.28] en tu cara que ya no parecen
+[  581.28 -   583.28] si se llama parecen 3 veces
+[  583.28 -   585.28] la factura
+[  585.28 -   587.28] entonces
+[  587.28 -   592.61] ¿a qué vendor
+[  592.61 -   594.61] deben de ir?
+[  594.61 -   596.61] yo lo tengo acá en una cuadro
+[  596.61 -   598.61] de distribución
+[  598.61 -   605.63] que te
+[  605.63 -   607.63] veo por el verlo que
+[  607.63 -   609.63] gestiona Arangel
+[  609.63 -   611.63] entonces aquí
+[  611.63 -   613.63] dice
+[  613.63 -   615.63] gestiona Arangel
+[  615.63 -   617.63] así
+[  617.63 -   619.63] gestiona Arangel
+[  619.63 -   621.63] esta gestiona Arangel
+[  621.63 -   623.63] dice que va estos 3
+[  623.63 -   625.63] proveedores diferentes
+[  625.63 -   628.91] y
+[  628.91 -   630.91] pues obviamente
+[  630.91 -   632.91] tienen que ser el 33%
+[  632.91 -   634.91] de la factura cada uno
+[  634.91 -   636.91] entonces digamos que voy a hacer
+[  636.91 -   638.91] yo este
+[  638.91 -   640.91] por ejemplo
+[  640.91 -   642.91] el primero no
+[  642.91 -   646.26] es
+[  646.26 -   648.26] voy a cambiar aquí el
+[  648.26 -   650.26] vento
+[  650.26 -   656.70] por el 2 cost
+[  656.70 -   658.70] si no
+[  658.70 -   668.42] ahora que ya se cambia el vento
+[  670.42 -   672.42] y por ejemplo la factura tiene
+[  672.42 -   674.42] orden de compra
+[  674.42 -   676.42] tanco
+[  676.42 -   678.42] si va a tener vq porque
+[  678.42 -   680.42] tiene ima al 19%
+[  680.42 -   682.42] y es importante
+[  682.42 -   686.82] es lo que
+[  686.82 -   688.82] yo voy a sacar el 33%
+[  688.82 -   690.82] entonces tenemos este total
+[  690.82 -   692.82] de sus costas
+[  692.82 -   696.86] y el ima
+[  696.86 -   698.86] y
+[  698.86 -   703.46] estoy
+[  703.46 -   705.46] por el 33
+[  705.46 -   707.46] punto
+[  707.46 -   709.46] el 1 tenía ahora que hablo
+[  709.46 -   711.46] todo más
+[  711.46 -   713.46] por 33.35%
+[  713.46 -   741.09] entonces
+[  741.09 -   743.09] todas van a ser con
+[  743.09 -   745.09] esta base
+[  745.09 -   747.09] de importe
+[  747.09 -   749.09] de IVA
+[  749.09 -   757.55] que es la cantidad de IVA
+[  765.66 -   779.02] tienen que salir aquí una palomita
+[  779.02 -   781.02] que en este caso
+[  781.02 -   783.02] está confirmando que ahí está el
+[  783.02 -   785.02] el check
+[  785.02 -   788.78] los correctos
+[  788.78 -   790.78] entonces yo aquí en el texto
+[  790.78 -   792.78] le voy a poner
+[  792.78 -   794.78] la costa de
+[  794.78 -   796.78] el mes
+[  796.78 -   798.78] de encurso
+[  798.78 -   800.78] que es el 03
+[  800.78 -   802.78] que yo en el 26
+[  802.78 -   804.78] la del año
+[  804.78 -   806.78] como en este caso es una renta fija
+[  806.78 -   808.78] bueno eso porque ya lo conozco
+[  808.78 -   810.78] pero
+[  810.78 -   812.78] tengo que
+[  812.78 -   814.78] hacer por ejemplo
+[  814.78 -   816.78] tomar estos 4
+[  816.78 -   825.06] estos que tengo que abrir
+[  825.06 -   827.06] esto de aquí podemos ir buscando
+[  827.06 -   830.37] por el check
+[  830.37 -   832.37] por la tienda
+[  832.37 -   837.02] en el 0.25
+[  837.02 -   839.02] el Anagen
+[  839.02 -   841.02] el Seco
+[  841.02 -   843.02] y aquí está el Canon
+[  843.02 -   845.02] que ahorita ya subió entonces le voy
+[  845.02 -   847.02] a cambiar esta parte
+[  847.02 -   852.10] que es el 324
+[  852.10 -   854.10] que es el 324
+[  854.10 -   856.10] es la nueva base
+[  856.10 -   858.10] entonces me voy para acá
+[  858.10 -   860.10] porque
+[  860.10 -   862.10] porque aquí me va a decir
+[  862.10 -   864.10] el IVA reducible
+[  864.10 -   866.10] el IVA reducible
+[  866.10 -   868.10] que ya te recalculó
+[  868.10 -   870.10] todo esto está formulado
+[  870.10 -   872.10] esto está calculado
+[  872.10 -   874.10] según el porcentaje
+[  874.10 -   876.10] que ellos comentaron
+[  876.10 -   878.10] que tienen de porcentaje
+[  878.10 -   880.10] de entes de sol
+[  880.10 -   882.10] porque esos son los que son los reducibles
+[  882.10 -   884.10] en IVA que vamos a reducir
+[  884.10 -   887.63] bueno
+[  887.63 -   889.63] que se va a hacer con este IVA reducible
+[  889.63 -   891.63] si te fijan este tiene el
+[  891.63 -   893.63] VW
+[  893.63 -   895.63] y este
+[  895.63 -   897.63] VQ
+[  897.63 -   899.63] lo de la columna J
+[  899.63 -   901.63] eso lo que vamos a poner a la cuenta de IVA
+[  903.63 -   905.63] como de una manera informativa
+[  905.63 -   907.63] es lo primero que voy a poner
+[  907.63 -   909.63] este
+[  909.63 -   911.63] va a ser
+[  911.63 -   913.63] este importe
+[  913.63 -   915.63] 174
+[  915.63 -   917.63] 37
+[  917.63 -   921.07] una estrella
+[  921.07 -   924.51] 3 listos y unos débitos
+[  924.51 -   926.51] ehh
+[  926.51 -   928.51] ahi bueno debería hacer el 35%
+[  928.51 -   930.51] por acá
+[  930.51 -   932.51] esto me lo voy a llevar para
+[  932.51 -   951.36] estar haciendo más
+[  951.36 -   953.36] en cada uno de los 3 puntos
+[  953.36 -   955.36] tengo que poner el 35%
+[  955.36 -   959.38] de IVA reducible
+[  959.38 -   961.38] esta cantidad
+[  961.38 -   963.38] entonces si se acuerdan era
+[  963.38 -   965.38] VW
+[  967.38 -   969.38] VW van 40
+[  969.38 -   971.38] y el VQ es el 50
+[  971.38 -   976.42] la cuenta de IVA
+[  976.42 -   978.42] la tomamos
+[  978.42 -   980.42] 3
+[  980.42 -   982.42] ahi esta
+[  982.42 -   984.42] la cuenta de IVA
+[  984.42 -   986.42] la tengo aqui
+[  986.42 -   988.42] la tengo aqui
+[  988.42 -   990.42] profistencia
+[  990.42 -   992.42] si lo tomamos de acá
+[  994.42 -   996.42] podemos tomar de aquí
+[  996.42 -   998.42] o lo podemos tomar también
+[  998.42 -  1000.42] por acá
+[ 1000.42 -  1002.42] de este otro
+[ 1002.42 -  1004.42] ejercicio que tenemos
+[ 1004.42 -  1006.42] buscamos la tienda 25
+[ 1006.42 -  1009.76] no siempre nos basamos
+[ 1009.76 -  1011.76] en este listado
+[ 1011.76 -  1013.76] porque hay veces que se reciben
+[ 1013.76 -  1015.76] facturas directo del proveedor
+[ 1015.76 -  1017.76] o sea no lo manda un usuario interno
+[ 1017.76 -  1019.76] de la empresa
+[ 1019.76 -  1021.76] digamos que el proveedor nos manda una factura
+[ 1021.76 -  1023.76] no sabemos a donde
+[ 1023.76 -  1025.76] tenemos que recitarlo
+[ 1025.76 -  1027.76] a que tienda o con que seco
+[ 1027.76 -  1029.76] una manera en la que podemos
+[ 1029.76 -  1031.76] visualizarlos
+[ 1031.76 -  1033.76] aquí por aquí
+[ 1033.76 -  1035.76] le gustando
+[ 1035.76 -  1037.76] que tiene
+[ 1037.76 -  1039.76] que
+[ 1039.76 -  1041.76] tienda es
+[ 1041.76 -  1043.76] no dice aquí la tienda
+[ 1043.76 -  1045.76] dice como que el octano
+[ 1045.76 -  1047.76] un número incerno del octano
+[ 1047.76 -  1049.76] de local
+[ 1049.76 -  1051.76] hay algún
+[ 1051.76 -  1053.76] dato que nos puede indicar
+[ 1053.76 -  1055.76] a ver
+[ 1055.76 -  1057.76] es 0.25
+[ 1057.76 -  1059.76] o 0.25
+[ 1067.86 -  1069.86] en este caso si no nos lo indican
+[ 1069.86 -  1071.86] nos abriamos
+[ 1073.86 -  1075.86] a ese tipo de
+[ 1075.86 -  1077.86] tienda
+[ 1077.86 -  1079.86] pero bueno
+[ 1079.86 -  1081.86] para saber si es venta
+[ 1081.86 -  1083.86] fija o venta variable
+[ 1083.86 -  1085.86] nos esperamos que nos cambien
+[ 1085.86 -  1087.86] a este otro exchange
+[ 1087.86 -  1089.86] que es de contrato
+[ 1089.86 -  1091.86] en el que podemos
+[ 1091.86 -  1093.86] ver este
+[ 1093.86 -  1095.86] teco que les comento
+[ 1095.86 -  1097.86] en el que nos vamos a basar
+[ 1097.86 -  1099.86] 7.3.0.1
+[ 1099.86 -  1101.86] yo voy a buscarlo aquí
+[ 1101.86 -  1105.71] en el que se ve
+[ 1105.71 -  1107.71] y como no está en el listado
+[ 1107.71 -  1109.71] de contrato
+[ 1109.71 -  1111.71] en base
+[ 1111.71 -  1113.71] 0.25
+[ 1113.71 -  1115.71] te lo vamos
+[ 1115.71 -  1117.71] a observar
+[ 1117.71 -  1121.98] aquí está
+[ 1121.98 -  1123.98] aquí
+[ 1123.98 -  1125.98] aquí está el diente
+[ 1125.98 -  1127.98] aquí está el diente de contrato
+[ 1127.98 -  1129.98] así también nos indican
+[ 1129.98 -  1131.98] lo que es el teco
+[ 1131.98 -  1133.98] aunque solamente tuviéramos por ejemplo
+[ 1133.98 -  1135.98] el número de contrato
+[ 1135.98 -  1137.98] o así
+[ 1137.98 -  1139.98] podríamos verlo
+[ 1139.98 -  1141.98] igual aquí también tienes una base
+[ 1141.98 -  1143.98] que se diga diferente a la que
+[ 1143.98 -  1145.98] ah no aquí no tiene que estar correcta
+[ 1145.98 -  1147.98] 7.3.0.1
+[ 1147.98 -  1149.98] 7.3.0.1
+[ 1149.98 -  1151.98] un poquito diferente
+[ 1151.98 -  1153.98] pero este si no lo
+[ 1153.98 -  1155.98] te muevan cada mes
+[ 1155.98 -  1157.98] en el listado de contrato
+[ 1157.98 -  1159.98] como está vigente
+[ 1159.98 -  1161.98] nosotros
+[ 1161.98 -  1163.98] paremos entonces acá
+[ 1163.98 -  1165.98] que debemos de ponerme la cuenta
+[ 1165.98 -  1167.98] de arriendo pico
+[ 1167.98 -  1169.98] si estuviera acá
+[ 1169.98 -  1171.98] como
+[ 1171.98 -  1173.98] testado
+[ 1173.98 -  1175.98] si aquí dijera testado
+[ 1175.98 -  1177.98] o
+[ 1177.98 -  1179.98] contrato
+[ 1179.98 -  1181.98] por vencer
+[ 1181.98 -  1183.98] pero por ejemplo
+[ 1183.98 -  1185.98] cerrado
+[ 1185.98 -  1187.98] reemplazo por esto
+[ 1187.98 -  1189.98] estas rentas
+[ 1189.98 -  1191.98] salían a la cuenta de
+[ 1191.98 -  1193.98] arriendo variante
+[ 1193.98 -  1195.98] no a la de arriendo pico
+[ 1195.98 -  1197.98] porque eso como es que está vigente
+[ 1197.98 -  1199.98] vamos a usar la cuenta de arriendo pico
+[ 1199.98 -  1201.98] vamos a abrir una
+[ 1201.98 -  1203.98] una niña más
+[ 1203.98 -  1205.98] y vamos a mandarlo
+[ 1205.98 -  1207.98] a arriendo pico
+[ 1207.98 -  1209.98] que vamos a mandar a arriendo pico
+[ 1209.98 -  1211.98] lo que es el tuplo tan
+[ 1211.98 -  1213.98] y completito
+[ 1213.98 -  1215.98] como
+[ 1215.98 -  1217.98] y vale 9%
+[ 1217.98 -  1219.98] y bueno
+[ 1219.98 -  1221.98] vamos a ponernos de aquí
+[ 1221.98 -  1223.98] lo que es el teco
+[ 1223.98 -  1225.98] vamos a pegar aquí
+[ 1225.98 -  1227.98] y vamos a ir con esta redacción
+[ 1227.98 -  1229.98] que estaba ahí
+[ 1229.98 -  1231.98] pues en cada una de estas cosas
+[ 1231.98 -  1233.98] que sería renta pica
+[ 1233.98 -  1235.98] porque aquí está
+[ 1235.98 -  1237.98] en el listado
+[ 1237.98 -  1239.98] del contrato
+[ 1239.98 -  1241.98] le podemos poner diagonal
+[ 1241.98 -  1243.98] 33%
+[ 1243.98 -  1245.98] entre los 3% de la facuda
+[ 1245.98 -  1247.98] de la tienda 0.25
+[ 1247.98 -  1249.98] eso venía
+[ 1249.98 -  1251.98] en mi correo electrónico
+[ 1251.98 -  1253.98] aquí
+[ 1253.98 -  1255.98] el profe center también venía en el correo electrónico
+[ 1255.98 -  1257.98] esto lo copiando
+[ 1257.98 -  1259.98] lo podemos pegar acá
+[ 1259.98 -  1261.98] podemos pegar acá
+[ 1261.98 -  1263.98] podemos pegar acá
+[ 1263.98 -  1265.98] esto no son de renta pica
+[ 1265.98 -  1267.98] entonces vamos a poner aquí
+[ 1267.98 -  1269.98] este es
+[ 1269.98 -  1276.46] y va de usted
+[ 1276.46 -  1278.46] porque cada niña debe de ir distrito
+[ 1278.46 -  1280.46] que es lo que estamos poniendo
+[ 1280.46 -  1282.46] por ejemplo que aquí
+[ 1282.46 -  1284.46] en la factura
+[ 1284.46 -  1286.46] en mi edad más
+[ 1286.46 -  1288.46] conceptos aquí
+[ 1288.46 -  1290.46] que dijera por ejemplo agua
+[ 1290.46 -  1292.46] acueducto
+[ 1292.46 -  1294.46] energía o algo así
+[ 1294.46 -  1296.46] pues yo haría una niña más
+[ 1296.46 -  1298.46] que fuera la cuenta de energía
+[ 1298.46 -  1300.46] que como le dije que tengo un cartel
+[ 1300.46 -  1302.46] de cuentas
+[ 1302.46 -  1304.46] que energía, que agua, que acueducto
+[ 1304.46 -  1306.46] sería pues a las cuentas estas
+[ 1306.46 -  1308.46] con el teco
+[ 1308.46 -  1310.46] que nos informaron en el correo
+[ 1310.46 -  1312.46] y aquí se los modificaría
+[ 1312.46 -  1314.46] aquí es donde iría
+[ 1314.46 -  1316.46] en el día este agua o lo que sea
+[ 1316.46 -  1318.46] y aquí en el objeto
+[ 1318.46 -  1320.46] debería ir
+[ 1320.46 -  1322.46] una pequeña referencia
+[ 1322.46 -  1324.46] a todo lo que hay acá
+[ 1324.46 -  1326.46] por ejemplo venta pica
+[ 1326.46 -  1328.46] en 38%
+[ 1328.46 -  1330.46] son topones
+[ 1330.46 -  1332.46] y va
+[ 1332.46 -  1334.46] y si hubiera energía
+[ 1334.46 -  1336.46] pues aquí también diagonal
+[ 1336.46 -  1338.46] energía diagonal y acueducto
+[ 1338.46 -  1340.46] hasta aquí tiene que ir en referencia
+[ 1340.46 -  1342.46] a todo lo concepto
+[ 1342.46 -  1344.46] que viene en la factura
+[ 1344.46 -  1346.46] entonces de aquí ya está vamos
+[ 1346.46 -  1349.90] a como yo todavía no supone
+[ 1349.90 -  1351.90] que va a estar, se me va a ir para atrás
+[ 1351.90 -  1353.90] para poderle conectar
+[ 1353.90 -  1355.90] para poderle conectar
+[ 1357.90 -  1375.74] para no estabilizar
+[ 1375.74 -  1392.08] tiene que volver
+[ 1392.08 -  1394.08] verde
+[ 1394.08 -  1403.31] ahí ya está verde
+[ 1403.31 -  1405.31] entonces ya va a poder proliferar
+[ 1405.31 -  1410.06] un poquito
+[ 1410.06 -  1416.38] un poco ahorita
+[ 1416.38 -  1418.38] hemos utilizado
+[ 1418.38 -  1420.38] cuatro excel
+[ 1420.38 -  1422.38] y uno
+[ 1422.38 -  1424.38] una hojanza para hacer
+[ 1424.38 -  1426.38] pues la cuenta
+[ 1426.38 -  1428.38] y lo que
+[ 1428.38 -  1440.30] incorporo por acá
+[ 1440.30 -  1442.30] y esto es con cada bola
+[ 1442.30 -  1444.30] ajá, es perfecto
+[ 1444.30 -  1449.73] y esto es
+[ 1449.73 -  1451.73] lo hace semanal metuál
+[ 1451.73 -  1453.73] es semanal
+[ 1453.73 -  1455.73] es semanal metuál
+[ 1455.73 -  1457.73] no, no, no
+[ 1457.73 -  1459.73] no, no, no
+[ 1459.73 -  1461.73] no, no
+[ 1461.73 -  1463.73] ahí está talo
+[ 1463.73 -  1465.73] no tiene totalmente
+[ 1465.73 -  1467.73] el luto
+[ 1467.73 -  1469.73] pero ahorita como de cierre
+[ 1469.73 -  1471.73] pues puede poner así
+[ 1471.73 -  1473.73] y el proceso se repite con cada uno
+[ 1473.73 -  1475.73] pero
+[ 1475.73 -  1477.73] no hay algún paso final
+[ 1477.73 -  1479.73] no hay algún
+[ 1479.73 -  1481.73] este
+[ 1481.73 -  1483.73] o por ejemplo cuando terminas el último
+[ 1483.73 -  1485.73] ahí se acaba todo el proceso
+[ 1485.73 -  1491.92] pues aquí esta regla no es para todo
+[ 1491.92 -  1493.92] o sea por ejemplo
+[ 1493.92 -  1495.92] este proveedor
+[ 1495.92 -  1497.92] te registras tres vendores diferentes
+[ 1497.92 -  1499.92] hay algunos que a dos vendores diferentes
+[ 1499.92 -  1501.92] y pues de día hay como 65 de una
+[ 1501.92 -  1503.92] 45 por cuenta
+[ 1505.92 -  1507.92] bueno en este caso
+[ 1507.92 -  1509.92] es un caso particular en el que
+[ 1509.92 -  1511.92] esos tres vendores
+[ 1511.92 -  1513.92] hay
+[ 1513.92 -  1515.92] dos de ellos
+[ 1515.92 -  1517.92] se les debe de
+[ 1517.92 -  1519.92] registrar la restricción
+[ 1519.92 -  1521.92] y a uno no
+[ 1521.92 -  1523.92] hay algunos en los que
+[ 1523.92 -  1525.92] por ejemplo
+[ 1525.92 -  1527.92] a dos vendores
+[ 1527.92 -  1529.92] y a un vendor
+[ 1529.92 -  1531.92] si se le registra
+[ 1531.92 -  1533.92] restricción y al otro no
+[ 1533.92 -  1535.92] y luego al final
+[ 1535.92 -  1537.92] de registrar por ejemplo
+[ 1537.92 -  1539.92] si yo registro estas tres 30
+[ 1539.92 -  1541.92] y por tiempo al final
+[ 1541.92 -  1543.92] estas tres vendores
+[ 1543.92 -  1545.92] en una sola factura
+[ 1545.92 -  1547.92] que me den total de la factura
+[ 1547.92 -  1549.92] pero en un cuarto
+[ 1549.92 -  1551.92] lo que tiene bien entendido
+[ 1553.92 -  1555.92] por ejemplo aquí ya me esta dando
+[ 1555.92 -  1557.92] y si se digan tiene tres
+[ 1557.92 -  1559.92] pretensiones
+[ 1559.92 -  1561.92] activadas
+[ 1561.92 -  1563.92] y aquí manualmente le tengo que
+[ 1563.92 -  1568.42] dar para atrás
+[ 1568.42 -  1571.73] tengo que filmar la parte de restricción
+[ 1571.73 -  1573.73] y tengo que
+[ 1573.73 -  1575.73] hacer
+[ 1575.73 -  1579.68] un
+[ 1579.68 -  1581.68] pues aquí tengo que irme
+[ 1581.68 -  1583.68] a ver que este vendor
+[ 1583.68 -  1585.68] como se ha recuperado anteriormente
+[ 1585.68 -  1587.68] que fue el uno en el
+[ 1587.68 -  1589.68] irme a ver este
+[ 1589.68 -  1591.68] vendor
+[ 1591.68 -  1593.68] como el histórico digamos así
+[ 1593.68 -  1595.68] o sea desde el enero
+[ 1595.68 -  1597.68] desde el enero al aspecto
+[ 1597.68 -  1599.68] quiero ver un ejemplo anterior
+[ 1599.68 -  1601.68] y digamos
+[ 1601.68 -  1603.68] voy a ver
+[ 1603.68 -  1605.68] si quiero ver los datos
+[ 1605.68 -  1607.68] de los impuestos aunque tiene tres impuestos
+[ 1607.68 -  1609.68] activados nada mas te le va a aplicar
+[ 1609.68 -  1611.68] el lado por histone
+[ 1611.68 -  1613.68] o sea por ver
+[ 1613.68 -  1615.68] los impuestos anteriores
+[ 1615.68 -  1617.68] desde este lado
+[ 1617.68 -  1619.68] entonces le borro los demás
+[ 1619.68 -  1621.68] que tengo que poner la base
+[ 1621.68 -  1623.68] y acá en impuestos
+[ 1623.68 -  1625.68] si se fijan como que me lo dividen
+[ 1625.68 -  1627.68] 2 pero todo tiene que
+[ 1627.68 -  1629.68] ser regado acá a la primera linea
+[ 1629.68 -  1631.68] de nubetu
+[ 1631.68 -  1633.68] tengo que escutarle lo que se calcula
+[ 1633.68 -  1635.68] solo el impuesto porque se calcula mal
+[ 1635.68 -  1637.68] y le tengo que poner
+[ 1637.68 -  1639.68] el IVA
+[ 1639.68 -  1641.68] que acá lo tengo
+[ 1641.68 -  1643.68] el IVA correcto
+[ 1643.68 -  1645.68] lo tengo que poner acá
+[ 1645.68 -  1647.68] y ahí ya está listo
+[ 1647.68 -  1649.68] para registrar
+[ 1649.68 -  1651.68] pero digamos este
+[ 1651.68 -  1653.68] vendor pues si tiene
+[ 1653.68 -  1655.68] nuestra retención
+[ 1655.68 -  1657.68] a los otros en este caso
+[ 1657.68 -  1659.68] nosotros también
+[ 1659.68 -  1661.68] tenemos que tener la retención
+[ 1661.68 -  1663.68] pero si hay algunos donde
+[ 1663.68 -  1665.68] son tres posteos
+[ 1665.68 -  1667.68] y los tienen la retención
+[ 1667.68 -  1669.68] no, no
+[ 1669.68 -  1671.68] y ahí probablemente
+[ 1671.68 -  1673.68] eso entre entre estas acturas
+[ 1673.68 -  1675.68] se hace
+[ 1675.68 -  1677.68] con las otras
+[ 1677.68 -  1679.68] y una vez que tengo las otras tres
+[ 1679.68 -  1681.68] como les digo o sea
+[ 1681.68 -  1683.68] tengo que juntarlas
+[ 1683.68 -  1685.68] en un puesto de extra
+[ 1685.68 -  1687.68] en el frío un 44
+[ 1687.68 -  1689.68] a un 44
+[ 1689.68 -  1696.03] por ejemplo este es el segundo posteo
+[ 1696.03 -  1698.03] y el segundo
+[ 1705.78 -  1712.06] ah no, a una hoja no
+[ 1712.06 -  1714.06] bueno este
+[ 1714.06 -  1716.06] entonces esta parte en la primera
+[ 1716.06 -  1718.06] parte de
+[ 1718.06 -  1720.06] un todo de esta factura ya está registrado
+[ 1720.06 -  1722.06] entonces voy con el siguiente vendor
+[ 1722.06 -  1724.06] y este
+[ 1724.06 -  1726.06] igual cambiarle el vendor
+[ 1726.06 -  1728.06] poniendo post
+[ 1728.06 -  1740.02] vamos
+[ 1740.02 -  1742.02] ahora si ya está cambiando el vendor
+[ 1742.02 -  1744.02] entonces me voy a
+[ 1744.02 -  1746.02] cambiar eso
+[ 1746.02 -  1748.02] porque no lo ponen solo
+[ 1748.02 -  1752.29] por qué
+[ 1752.29 -  1754.29] aquí vamos a ponerme
+[ 1754.29 -  1756.29] la cuentita que hizo
+[ 1756.29 -  1758.29] sí, sí, sí
+[ 1758.29 -  1760.29] que
+[ 1760.29 -  1762.29] tenía el futuro
+[ 1762.29 -  1766.91] de eso
+[ 1766.91 -  1771.09] también aquí
+[ 1771.09 -  1776.26] estaba este IVA
+[ 1776.26 -  1786.58] y este frío que siempre
+[ 1786.58 -  1788.58] ponemos
+[ 1788.58 -  1790.58] primero el UVQ
+[ 1790.58 -  1792.58] UVQ
+[ 1792.58 -  1794.58] UVW
+[ 1794.58 -  1796.58] deteniéndonos a esta parte
+[ 1796.58 -  1798.58] reducido
+[ 1798.58 -  1800.58] y ya le habíamos acabado el 33
+[ 1800.58 -  1804.24] porque este es
+[ 1804.24 -  1809.47] entonces ponemos un posteo en el 4
+[ 1809.47 -  1811.47] ah, acá
+[ 1811.47 -  1813.47] este debe ir una vez
+[ 1813.47 -  1815.47] mismo en la
+[ 1815.47 -  1817.47] en la distancia
+[ 1817.47 -  1819.47] y la cuentita de IVA
+[ 1819.47 -  1822.88] la cuentita de IVA
+[ 1822.88 -  1829.30] esta
+[ 1829.30 -  1831.30] el 33 costo lo agarramos de acá
+[ 1831.30 -  1833.30] el 33 costo
+[ 1833.30 -  1837.41] texto
+[ 1837.41 -  1839.41] ahora si
+[ 1839.41 -  1841.41] le ponemos cero credo
+[ 1841.41 -  1843.41] 23 y 10
+[ 1843.41 -  1847.49] y aquí ya me lo voy a arrojar
+[ 1847.49 -  1849.49] Luzi, osea como ya lo he hablado
+[ 1849.49 -  1851.49] entonces ya lo puedo copiar
+[ 1851.49 -  1853.49] me puedo pegar acá
+[ 1853.49 -  1855.49] me puedo pegar acá
+[ 1855.49 -  1857.49] en este caso de
+[ 1857.49 -  1859.49] el 33% del IVA
+[ 1859.49 -  1861.49] entonces le voy a borrar
+[ 1861.49 -  1863.49] de renta fija
+[ 1863.49 -  1865.49] y voy a abrir uno nuevo que se tiene en esta fija
+[ 1865.49 -  1867.49] entonces
+[ 1867.49 -  1869.49] lo pegamos así y le borramos la parte
+[ 1869.49 -  1871.49] de la excepción de la sopra
+[ 1871.49 -  1873.49] si
+[ 1873.49 -  1875.49] el profe tiene IVA
+[ 1875.49 -  1879.09] como este
+[ 1879.09 -  1881.09] cuando la testa está abierta todavía
+[ 1881.09 -  1883.09] entonces la cuentita del IVA
+[ 1883.09 -  1887.55] aquí
+[ 1887.55 -  1889.55] el 32
+[ 1889.55 -  1893.50] y ahí ya podemos contrarre
+[ 1893.50 -  1951.92] lo que tiene un tren
+[ 1951.92 -  1953.92] si otra persona está activa
+[ 1953.92 -  1957.49] y vamos a ver por el vendedor
+[ 1957.49 -  1959.49] y vamos a poner
+[ 1959.49 -  1961.49] hacia atrás
+[ 1961.49 -  1969.63] para comenzar el distrao
+[ 1969.63 -  1971.63] solamente tiene que estar en el lado
+[ 1971.63 -  1975.74] si usted se borra de esto
+[ 1975.74 -  1977.74] y se pone en la base
+[ 1977.74 -  1979.74] hay que ponerle
+[ 1979.74 -  1981.74] todo el impuesto cargado a Luzi
+[ 1981.74 -  1983.74] 10
+[ 1983.74 -  1991.63] si esta tan fija que no
+[ 1991.63 -  1995.94] pero
+[ 1995.94 -  1999.92] tornamos
+[ 2017.54 -  2019.54] y aquí
+[ 2019.54 -  2021.54] entonces hay al lado
+[ 2021.54 -  2023.54] de la posteo
+[ 2023.54 -  2025.54] hay la posteo
+[ 2025.54 -  2027.54] entonces hay la pálteza
+[ 2027.54 -  2032.35] entonces
+[ 2032.35 -  2034.35] ahí está el vendedor
+[ 2034.35 -  2046.53] lo mostramos
+[ 2046.53 -  2048.53] aquí
+[ 2048.53 -  2050.53] para el vendedor
+[ 2050.53 -  2052.53] con el mudo que tiene
+[ 2052.53 -  2054.53] perfectance
+[ 2054.53 -  2068.11] por último
+[ 2068.11 -  2070.11] los detalles que ponen
+[ 2070.11 -  2072.11] para el vendedor
+[ 2072.11 -  2074.11] y aquí son los primeros que abrimos
+[ 2074.11 -  2076.11] como siempre
+[ 2076.11 -  2078.11] un 40 y un 50
+[ 2078.11 -  2080.11] al vendedor y al vendedor
+[ 2080.11 -  2082.11] con el importe
+[ 2082.11 -  2084.11] y ya habíamos sacado
+[ 2084.11 -  2086.11] del IVA
+[ 2086.11 -  2090.19] con esto
+[ 2090.19 -  2092.19] y aquí
+[ 2092.19 -  2094.19] si usted corta este
+[ 2094.19 -  2097.92] ahí está
+[ 2097.92 -  2099.92] entonces va a la cuenta del IVA
+[ 2099.92 -  2103.84] al IVA
+[ 2103.84 -  2105.84] y habíamos uno más
+[ 2105.84 -  2107.84] con el suportal de toda la pastura
+[ 2107.84 -  2109.84] que se va a dar la cuenta
+[ 2109.84 -  2111.84] de haberlo hecho
+[ 2115.41 -  2117.41] chico
+[ 2117.41 -  2121.74] con el suportal
+[ 2121.74 -  2123.74] y en el sector
+[ 2123.74 -  2125.74] aquí están los deditos
+[ 2125.74 -  2127.74] aquí
+[ 2127.74 -  2131.54] entonces aquí
+[ 2131.54 -  2133.54] y aquí
+[ 2133.54 -  2135.54] aquí
+[ 2135.54 -  2137.54] tiene el suportal
+[ 2137.54 -  2139.54] y la posteo
+[ 2141.54 -  2146.64] ahí
+[ 2146.64 -  2150.53] se va a copiar
+[ 2150.53 -  2152.53] en el suportal
+[ 2152.53 -  2157.92] y después de hacer el suportal
+[ 2157.92 -  2159.92] falta un
+[ 2159.92 -  2190.14] que aquí
+[ 2190.14 -  2192.14] se registra estos tres vendedor
+[ 2192.14 -  2194.14] pero aquí dice que se debe
+[ 2194.14 -  2196.14] compensar esos tres
+[ 2196.14 -  2198.14] a este vendedor
+[ 2198.14 -  2221.49] si lo acercamos
+[ 2221.49 -  2225.54] con pocos anteriores
+[ 2225.54 -  2227.54] porque son como 300
+[ 2227.54 -  2229.54] que proveedores
+[ 2229.54 -  2231.54] entonces no
+[ 2231.54 -  2233.54] no es como que me voy a
+[ 2233.54 -  2235.54] o sea no me esté todo la
+[ 2235.54 -  2237.54] por ejemplo en este caso todos tenían
+[ 2237.54 -  2239.54] activar la A2
+[ 2239.54 -  2241.54] que tienen que tener
+[ 2241.54 -  2245.87] activo
+[ 2245.87 -  2261.15] siempre es bueno ir a mida
+[ 2261.15 -  2263.15] que es el último posteo
+[ 2263.15 -  2265.15] y el paso adicional
+[ 2265.15 -  2267.15] que rezar es
+[ 2267.15 -  2269.15] abrir un eseión 44
+[ 2269.15 -  2271.15] que damos vendedor
+[ 2271.15 -  2273.15] vamos
+[ 2273.15 -  2275.15] como los primeros posteos que están en el su vendedor
+[ 2275.15 -  2277.15] por entre
+[ 2277.15 -  2279.15] digamos el primer vendedor
+[ 2279.15 -  2284.38] y
+[ 2284.38 -  2286.38] con el
+[ 2286.38 -  2288.38] un 1
+[ 2288.38 -  2290.38] que damos entre
+[ 2290.38 -  2292.38] damos una palomita
+[ 2292.38 -  2294.38] y aquí está mi factura
+[ 2294.38 -  2296.38] esta factura me la tengo yo que llevar
+[ 2296.38 -  2298.38] hacia
+[ 2302.38 -  2304.38] la tengo yo que llevar a otro vendedor
+[ 2304.38 -  2306.38] entonces
+[ 2306.38 -  2308.38] tengo que ser un 31
+[ 2308.38 -  2310.38] al vendedor que dice acá
+[ 2310.38 -  2312.38] que no lo hemos pocado todavía
+[ 2312.38 -  2314.38] porque allá tiene que
+[ 2314.38 -  2316.38] estar en total
+[ 2316.38 -  2318.38] completo la factura
+[ 2318.38 -  2320.38] no solamente un 33
+[ 2320.38 -  2322.38] un 1
+[ 2322.38 -  2324.38] un 1
+[ 2324.38 -  2326.38] una
+[ 2326.38 -  2328.38] un 2
+[ 2328.38 -  2330.38] un 3
+[ 2330.38 -  2332.38] un 4
+[ 2332.38 -  2334.38] un 5
+[ 2334.38 -  2336.38] un 6
+[ 2336.38 -  2338.38] un 7
+[ 2338.38 -  2340.38] un 14
+[ 2340.38 -  2342.38] un 14
+[ 2342.38 -  2344.38] un 15
+[ 2344.38 -  2346.38] un 14
+[ 2346.38 -  2350.43] un 15
+[ 2350.43 -  2354.35] un 15
+[ 2354.35 -  2357.98] un 10
+[ 2357.98 -  2363.31] un 11
+[ 2363.31 -  2368.22] un 12
+[ 2368.22 -  2370.22] un 14
+[ 2370.22 -  2372.22] un 15
+[ 2372.22 -  2381.42] un 14
+[ 2381.42 -  2391.39] un 15
+[ 2391.39 -  2393.39] un 18
+[ 2393.39 -  2395.39] un 18
+[ 2395.39 -  2400.72] un 19
+[ 2400.72 -  2402.72] un 19
+[ 2475.20 -  2481.18] ¿No? Vamos a ver, vamos a
+[ 2481.18 -  2485.68] tanto todo ya como que se va
+[ 2485.72 -  2491.32] a guardar el el Vendor que lo
+[ 2491.38 -  2494.82] vamos a mandar y el sexo o el
+[ 2494.88 -  2497.00] timbolano y lo salto de un
+[ 2497.06 -  2500.10] membro, lo mando a otro, ¿Verdad?
+[ 2500.16 -  2502.90] Y ahora sí, en el Vendor es
+[ 2502.96 -  2504.90] ven y deben de estar los tres
+[ 2504.90 -  2508.84] posteos y los tengo que hacer
+[ 2508.90 -  2516.61] todos en uno, están partidos
+[ 2516.67 -  2520.65] restantes, doy doy doy le quita
+[ 2520.71 -  2522.65] aquí y pues suma y ahora sí,
+[ 2522.71 -  2524.65] este es el portal de la factura,
+[ 2524.71 -  2527.65] como lo recién. Y le ponemos
+[ 2527.71 -  2529.65] aquí el pollo y así un punto
+[ 2529.71 -  2532.65] de un lado el timbolano y aquí
+[ 2532.71 -  2534.65] le vamos a poner, o sea, aquí
+[ 2534.71 -  2536.65] en el Vendor texto, pero aquí
+[ 2536.71 -  2537.65] ya le vamos a quitarlo el
+[ 2537.65 -  2539.65] tiempo, porque ya está el 100%
+[ 2539.71 -  2541.65] de la factura, no es necesario
+[ 2541.71 -  2543.65] que pongamos el 5% de la factura
+[ 2543.71 -  2547.65] y ya está el texto que no
+[ 2547.71 -  2549.65] implican ningún poste en base
+[ 2549.71 -  2552.65] y lo guardamos y eso está una
+[ 2552.71 -  2553.65] factura. Y todo este proceso
+[ 2553.71 -  2555.65] viene en el documento, en la
+[ 2555.71 -  2556.65] documentación que nos habías
+[ 2556.71 -  2558.65] platicado que está en la que
+[ 2558.71 -  2565.10] estaban trabajando. En la que
+[ 2565.16 -  2567.10] les pasa el último. Ah, es
+[ 2567.16 -  2570.10] ok. La relación de él.
+[ 2571.10 -  2575.83] Sí, correcto.
+[ 2576.83 -  2579.83] Tienen los, los excel sultanos,
+[ 2579.89 -  2582.83] es lo que se visualiza, o sea,
+[ 2582.89 -  2584.83] no es todo el excel lo que tú
+[ 2584.89 -  2589.20] gusta, pero está con una nada,
+[ 2589.26 -  2592.20] hay que quitar las cuentas,
+[ 2592.26 -  2594.20] pero lo que está haciendo
+[ 2594.26 -  2597.20] bañando.
+[ 2597.26 -  2601.83] ¿Y es eso que todavía no está
+[ 2601.89 -  2608.40] completo? ¿Tú qué está
+[ 2608.40 -  2610.40] haciendo?
+[ 2610.46 -  2612.40] Sí, hay que cambiar la
+[ 2612.46 -  2617.40] retención, que te busca en el
+[ 2617.46 -  2619.40] pasado, así que te vas a
+[ 2619.46 -  2621.40] buscar en el pasado, que es
+[ 2621.46 -  2624.40] igual, la retención, esto
+[ 2624.46 -  2627.40] se me decirte igual que un
+[ 2627.46 -  2632.88] post post pasado,
+[ 2632.94 -  2635.88] en lo que ustedes te gustan,
+[ 2635.94 -  2638.88] para lo de variables,
+[ 2638.88 -  2640.88] ¿Tú qué pones?
+[ 2640.94 -  2645.72] ¿Tú qué pones?
+[ 2645.78 -  2646.72] ¿Y qué lo que nos puede
+[ 2646.78 -  2648.72] hacer es el quivito?
+[ 2648.78 -  2649.72] Ah, se me hace que nos
+[ 2649.78 -  2650.72] encontre nada más la parte en
+[ 2650.78 -  2653.72] la que compensamos, ¿no?
+[ 2653.78 -  2656.72] Ok, agregó esta parte,
+[ 2656.78 -  2657.72] que fue el último, el último
+[ 2657.78 -  2658.72] partito que venimos ahorita,
+[ 2658.78 -  2659.72] en el primer punto y pues
+[ 2659.78 -  2661.72] esta parte.
+[ 2661.78 -  2663.72] Agregó esto a los, deja que
+[ 2663.78 -  2666.72] no se escapa.
+[ 2666.78 -  2668.72] Sí, solo me faltó esa parte,
+[ 2668.78 -  2670.72] pero lo más así es, tú
+[ 2670.72 -  2672.72] sabes, esto es tal cual.
+[ 2672.78 -  2674.72] Otra manera en la que podamos
+[ 2674.78 -  2678.72] utilitar este este archivo,
+[ 2678.78 -  2682.72] aquí lo tenía yo una,
+[ 2682.78 -  2684.72] como no sé qué entito,
+[ 2684.78 -  2685.72] pero como no pueden ayudar
+[ 2685.78 -  2694.07] este archivo.
+[ 2694.13 -  2696.07] Digamos, te sabes, la
+[ 2696.13 -  2706.01] tienda, cero, un kilo,
+[ 2706.07 -  2710.01] cero, cero, cero o no.
+[ 2711.01 -  2717.52] De la R, tienda, R, cero, uno.
+[ 2717.58 -  2719.52] De esa tienda nos emitemos
+[ 2719.58 -  2721.52] facturas de la mayoría,
+[ 2721.58 -  2723.52] de eso nos emitemos facturas
+[ 2723.58 -  2725.52] que citifican, o sea, no,
+[ 2725.58 -  2728.52] no tienen mucho relación,
+[ 2728.58 -  2730.52] pues físicamente, o sea,
+[ 2730.58 -  2731.52] aparentemente, o sea, si
+[ 2731.58 -  2733.52] vemos una y otra, hasta
+[ 2733.58 -  2734.52] ni siquiera pensaríamos que
+[ 2734.58 -  2736.52] son del mismo proveedor,
+[ 2736.58 -  2740.52] se podría decir, pero en
+[ 2740.52 -  2741.52] un mismo factura, lo que son
+[ 2741.58 -  2743.52] pues, pues, la administración,
+[ 2743.58 -  2748.52] este, algunos gastos
+[ 2748.58 -  2751.52] intangibles y acá pues son,
+[ 2751.58 -  2753.52] este, el arrendamiento como
+[ 2753.58 -  2756.52] tal, el canal de arrendamiento.
+[ 2756.58 -  2759.52] Y, este, en qué nos puede
+[ 2759.58 -  2762.52] servir esta, este, este,
+[ 2762.58 -  2763.52] si ustedes se fijan,
+[ 2763.58 -  2765.52] son un poco más grandes para
+[ 2765.58 -  2767.52] que lo logran apreciar.
+[ 2767.58 -  2773.26] Aquí tiene un numerito,
+[ 2773.26 -  2775.26] en la descripción que es
+[ 2775.32 -  2779.26] Do, Dion, 262.
+[ 2779.32 -  2782.26] Esto sí lo buscamos por aquí.
+[ 2784.26 -  2787.26] Y no, no, no.
+[ 2788.26 -  2792.73] Pero aquí, acá,
+[ 2792.73 -  2794.73] son el maquito,
+[ 2794.79 -  2798.73] inmueble, Do, Dion, 262.
+[ 2798.73 -  2799.73] Si te localizan.
+[ 2800.73 -  2802.73] Entonces, esto, aunque yo no
+[ 2802.73 -  2807.05] no tuviera el el dato dentro del
+[ 2807.05 -  2808.49] cuerpo, el correo, o sea, ahí
+[ 2808.49 -  2811.49] salgó la captura. En Luki podría
+[ 2811.49 -  2814.65] llegar a decir que corresponden
+[ 2814.65 -  2818.01] pues a la tienda R001 y que debo
+[ 2818.01 -  2820.37] reenterlo a este seco y a ese
+[ 2820.37 -  2823.05] reino. Este es el número de
+[ 2823.05 -  2824.45] proveedores.
+[ 2824.45 -  2833.38] No, no, no, no, no, no, no,
+[ 2833.38 -  2834.38] no, no, no, no, no, no, no, no,
+[ 2834.38 -  2835.38] no, no, no, no, no, no, no, no,
+[ 2835.38 -  2836.38] no, no, no, no, no, no, no,
+[ 2836.38 -  2837.38] no, no, no, no, no, no, no,
+[ 2837.38 -  2838.38] no, no, no, no, no, no, no,
+[ 2838.38 -  2839.38] no, no, no, no, no, no, no,
+[ 2839.38 -  2840.38] no, no, no, no, no, no, no,
+[ 2840.38 -  2841.38] no, no, no, no, no, no, no,
+[ 2841.38 -  2842.38] no, no, no, no, no, no, no,
+[ 2842.38 -  2843.38] no, no, no, no, no, no, no,
+[ 2843.38 -  2844.38] no, no, no, no, no, no, no,
+[ 2844.38 -  2845.38] no, no, no, no, no, no,
+[ 2845.38 -  2846.38] no, no, no, no, no, no,
+[ 2846.38 -  2847.38] no, no, no, no, no, no,
+[ 2847.38 -  2848.38] no, no, no, no, no,
+[ 2848.38 -  2849.38] no, no, no, no, no,
+[ 2849.38 -  2850.38] no, no, no, no, no, no,
+[ 2850.38 -  2851.38] no, no, no, no, no,
+[ 2883.81 -  2888.81] aquí. Pero, pero, ¿Oye? ¿Qué es esto?
+[ 2888.81 -  2891.81] Si te digan tu número, dos guión,
+[ 2891.81 -  2894.81] es ciento seis.
+[ 2894.81 -  2897.81] Yo me acuerdo.
+[ 2897.81 -  2902.70] Aquí.
+[ 2902.70 -  2905.70] Dos guión, cuánto peso.
+[ 2905.70 -  2909.70] Pero este pelo tiene guión, o sea, también puede variar la manera en la que viene
+[ 2909.70 -  2912.70] en la factura.
+[ 2912.70 -  2916.70] Aquí.
+[ 2916.70 -  2919.70] Aquí dice doce ciento seis.
+[ 2919.70 -  2923.70] O sea, si estás parecido, pero justamente, por ejemplo, uno no tiene guión,
+[ 2923.70 -  2927.70] y los todos en el mundo no han doce ciento seis.
+[ 2927.70 -  2930.70] Y ni siquiera tienes paz.
+[ 2930.70 -  2933.70] Pues todos son de los mismos locales.
+[ 2933.70 -  2936.70] Él es delogado.
+[ 2936.70 -  2942.93] Y aquí dice famosa local.
+[ 2942.93 -  2946.93] ¿Qué es esto? Pues son, pues, administración de la tienda,
+[ 2946.93 -  2953.11] y esto es el arrendamiento, como tal.
+[ 2953.11 -  2957.11] Tengo hasta ocho.
+[ 2957.11 -  2962.11] También tenemos uso tipo de ejercitos donde, pues,
+[ 2962.11 -  2968.11] con varias, como que varios,
+[ 2968.11 -  2972.11] pues, ítems que nos actualizan,
+[ 2972.11 -  2976.11] como publicidad, aire acondicionado,
+[ 2976.11 -  2980.11] cuando en pregunto, o por ejemplo acá,
+[ 2980.11 -  2984.11] pues, igual, publicidad, aire acondicionado, administración.
+[ 2984.11 -  2988.11] Y, este, aquí tengo
+[ 2988.11 -  2992.11] HMR dinero, o por qué les estoy mostrando esto.
+[ 2992.11 -  3000.09] Cuando están afilados varios sitios,
+[ 3000.09 -  3006.56] si ustedes se fijan, tiene aquí algo que se llama incentivo,
+[ 3006.56 -  3010.56] o sea, vemos que tenemos el total de la suma de todos los sitios,
+[ 3010.56 -  3016.56] y tenemos un incentivo, es decir, que es un incentivo como un descuento,
+[ 3016.56 -  3018.56] un descuento.
+[ 3018.56 -  3021.56] Entonces, aquí se hace,
+[ 3021.56 -  3025.56] se, de cada uno de los sitios se nos esfantora,
+[ 3025.56 -  3029.56] se saca que porcentaje de el total,
+[ 3029.56 -  3033.56] bueno, el total en este caso, corresponde a cada uno,
+[ 3033.56 -  3036.56] o sea, por ejemplo, esto,
+[ 3036.56 -  3038.56] esto lo debimos entre el total,
+[ 3038.56 -  3041.56] esto lo debimos entre el total, y corresponde a esta porcentaje,
+[ 3041.56 -  3043.56] y si tenemos estos porcentajes,
+[ 3043.56 -  3049.56] y a cada uno, ya tenemos que sacar cuánto es el 12%
+[ 3049.56 -  3054.56] de, por ejemplo, de publicidad de esto del otro,
+[ 3054.56 -  3061.56] para que en total se le haya descontado a cada uno de los sitios
+[ 3061.56 -  3065.56] el porcentaje que le corresponde a cada uno para distribuir
+[ 3065.56 -  3067.56] ese descuento.
+[ 3067.56 -  3073.99] Al final llegamos a este descuento.
+[ 3073.99 -  3078.30] Si ustedes fijan inclusión en el texto,
+[ 3078.30 -  3081.30] yo les puse este corresponde al incentivo,
+[ 3081.30 -  3085.30] y como me interesa el resultado,
+[ 3085.30 -  3087.30] si ustedes están cobrando el,
+[ 3087.30 -  3092.30] o bueno, correspondía el 0.37% de todo el total,
+[ 3092.30 -  3097.30] él le sacó este descuento,
+[ 3097.30 -  3106.95] 0.37% de descuento a interés.
+[ 3106.95 -  3107.95] Ay, en su primer oyente,
+[ 3107.95 -  3109.95] en vez de que está un poco...
+[ 3109.95 -  3110.95] No sé qué problema igual,
+[ 3110.95 -  3121.37] por eso lo estamos acabando.
+[ 3121.37 -  3123.37] Igual, en este caso, o sea,
+[ 3123.37 -  3125.37] algo que es incentivo,
+[ 3125.37 -  3128.37] o sea, hay veces que viene como incentivo,
+[ 3128.37 -  3130.37] o que viene como descuento,
+[ 3130.37 -  3133.37] o descuento por pronto pago, o hasta nada.
+[ 3133.37 -  3137.37] En este caso, vienen dos incentivos,
+[ 3137.37 -  3140.37] este incentivo y este nuevo incentivo.
+[ 3140.37 -  3141.37] Los dos suman,
+[ 3141.37 -  3144.37] e igual se saca el porcentaje de cada,
+[ 3144.37 -  3146.37] de cada item,
+[ 3146.37 -  3149.37] este multiplicado por este item,
+[ 3149.37 -  3152.37] y eso se pone como negativo para,
+[ 3152.37 -  3155.37] o sea, si así tenemos cuatro items,
+[ 3155.37 -  3157.37] tiene que haber otros cuatro,
+[ 3157.37 -  3159.37] aquí, en los contables,
+[ 3159.37 -  3161.37] con este negativo,
+[ 3161.37 -  3166.37] del porcentaje de este descuento,
+[ 3166.37 -  3168.37] que le corresponde a cada cuenta,
+[ 3168.37 -  3170.37] y pues tiene que, por ejemplo,
+[ 3170.37 -  3172.37] este porcentaje de publicidad,
+[ 3172.37 -  3175.37] descuentado a la cuenta de la publicidad.
+[ 3175.37 -  3178.37] El porcentaje correspondiente,
+[ 3178.37 -  3181.37] que se le iba a responder al aire acondicionado,
+[ 3181.37 -  3184.37] que se le cuenta al aire acondicionado,
+[ 3184.37 -  3187.37] este, aquí tengo como todo el incentivo de,
+[ 3187.37 -  3190.37] de cómo se vería ya el papel,
+[ 3190.37 -  3192.37] o sea, aquí, si están aquí,
+[ 3192.37 -  3195.37] están en negativo de los descuentos,
+[ 3195.37 -  3197.37] y pues acá dice,
+[ 3197.37 -  3200.37] incentivo de los descuentos comunes,
+[ 3200.37 -  3205.39] o en los descuentos comunes.
+[ 3205.39 -  3208.39] Y si te miran van a la cuenta,
+[ 3208.39 -  3210.39] por ejemplo, de SEO,
+[ 3210.39 -  3211.39] así está su descuento,
+[ 3211.39 -  3213.39] está en el valor total,
+[ 3213.39 -  3216.39] de cuando promociones que están al valor total,
+[ 3216.39 -  3219.39] y que está a la cuenta de cuando es promoción,
+[ 3219.39 -  3222.39] tu valor total y tu descuento.
+[ 3222.39 -  3226.15] Y, este,
+[ 3226.15 -  3228.15] bueno, eso nada más,
+[ 3228.15 -  3230.15] pero no sé cómo más,
+[ 3230.15 -  3233.15] algunos tacitos que vi,
+[ 3233.15 -  3237.15] y así como ya,
+[ 3237.15 -  3240.15] 100 meses, pues ya no tenemos mucho,
+[ 3240.15 -  3242.15] no, no tenemos,
+[ 3242.15 -  3244.15] ya tenemos que registrar.
+[ 3244.15 -  3248.15] ¿Cuánto registraron normalmente?
+[ 3248.15 -  3251.15] ¿Cómo también?
+[ 3251.15 -  3254.15] ¿Cuánto registraron normalmente?
+[ 3254.15 -  3256.15] ¿Cuántos de estas?
+[ 3256.15 -  3259.15] Sí, más o menos.
+[ 3259.15 -  3261.15] Son un aproximado de,
+[ 3261.15 -  3264.15] una, dos, cincuenta rensas,
+[ 3264.15 -  3267.15] y, este, como una presente,
+[ 3268.15 -  3269.15] este,
+[ 3269.15 -  3270.15] donde
+[ 3273.15 -  3274.15] como le digo,
+[ 3274.15 -  3275.15] no, no,
+[ 3275.15 -  3276.15] factura,
+[ 3276.15 -  3277.15] este,
+[ 3277.15 -  3278.15] ya no,
+[ 3278.15 -  3279.15] no,
+[ 3279.15 -  3280.15] no,
+[ 3280.15 -  3281.15] no,
+[ 3281.15 -  3282.15] no,
+[ 3282.15 -  3286.48] no,
+[ 3286.48 -  3287.48] no,
+[ 3287.48 -  3288.48] no,
+[ 3288.48 -  3289.48] no,
+[ 3289.48 -  3290.48] no,
+[ 3290.48 -  3291.48] no,
+[ 3291.48 -  3295.55] no,
+[ 3295.55 -  3296.55] no,
+[ 3296.55 -  3297.55] no,
+[ 3297.55 -  3298.55] no,
+[ 3298.55 -  3299.55] no,
+[ 3299.55 -  3300.55] no,
+[ 3300.55 -  3301.55] no,
+[ 3301.55 -  3302.55] no,
+[ 3302.55 -  3303.55] no,
+[ 3303.55 -  3304.55] no,
+[ 3304.55 -  3305.55] no,
+[ 3305.55 -  3306.55] no,
+[ 3306.55 -  3307.55] no,
+[ 3307.55 -  3308.55] no,
+[ 3308.55 -  3309.55] no,
+[ 3309.55 -  3310.55] no,
+[ 3310.55 -  3311.55] no,
+[ 3311.55 -  3312.55] no,
+[ 3312.55 -  3321.36] no,
+[ 3321.36 -  3322.36] no,
+[ 3322.36 -  3323.36] no,
+[ 3323.36 -  3324.36] no,
+[ 3324.36 -  3327.21] no,
+[ 3327.21 -  3328.21] no,
+[ 3328.21 -  3329.21] no,
+[ 3329.21 -  3331.75] no,
+[ 3331.75 -  3332.75] no,
+[ 3332.75 -  3333.75] no,
+[ 3333.75 -  3334.75] no,
+[ 3334.75 -  3335.75] no,
+[ 3335.75 -  3336.75] no,
+[ 3336.75 -  3337.75] no,
+[ 3337.75 -  3338.75] no,
+[ 3338.75 -  3339.75] no,
+[ 3339.75 -  3340.75] no,
+[ 3340.75 -  3341.75] no,
+[ 3341.75 -  3349.23] que se paga a ser más rápido. Pero entonces es que no falta ningún ejemplo de ver.
+[ 3349.23 -  3358.13] Pues eso es lo que es el flow más visual, es decir, como el que abarca más.
+[ 3358.13 -  3361.01] Ajá, que eso es lo que abarca.
+[ 3361.01 -  3378.11] Entonces, ¿qué es el proyecto? En algunos menos complejos en el sentido de que pues
+[ 3378.11 -  3383.83] no tengo que ser del posteo, es un polo bendo, siga. Pero el proceso es exactamente el mismo.
+[ 3383.83 -  3388.51] Nada más lo único que cambiaría y pues que no tengo que irlo en 3 o en 2.
+[ 3388.51 -  3400.20] Ah, ok, ok, ok. Bueno, entonces si quieres damos una checada bien al vídeo y nos
+[ 3400.20 -  3404.96] promotos de aquí y a ver qué es lo que más les podemos quitar el tiempo y ya te hacemos
+[ 3404.96 -  3410.08] un video, ya lo he promocido.
+[ 3410.08 -  3419.92] Yo creo que si nada más hay que encontrar como el punto específico del que podemos partir
+[ 3419.92 -  3428.08] a quitar tiempo, pero como están muchos, muchas noticias digamos, a estar medio confuso.
+[ 3428.08 -  3431.08] Pero creo que sí.
+[ 3431.16 -  3440.52] Me había comentado que como cada factura que te gustan, pues colocar diferentes,
+[ 3440.52 -  3445.96] es decir, o sea, por ejemplo, te dice que no es nada de arreglamiento, pero pues acá sí,
+[ 3445.96 -  3450.80] te comparte, digamos, la palabra arreglamiento, ¿no? Pero no siempre es todo lo mismo que
+[ 3450.80 -  3457.40] tienen, que a lo mejor pudiéramos traer un tipo catálogo de los conceptos que maneja
+[ 3457.40 -  3463.62] acá, pero con guía o algo así.
+[ 3463.62 -  3468.54] Pues sí, se podría, pero al final, bueno, no sé cuántos de entertainers, por ejemplo,
+[ 3468.54 -  3474.14] que te lleguen, pero creo que te tomaría más hasta el tiempo, ¿no?
+[ 3474.14 -  3482.40] Sí, porque son literalmente, están en un este, como no, dos minutos y un tabelón.
+[ 3482.40 -  3487.12] No te tomaría más que tiempo, o sea, sí serviría, la verdad que sí, pero
+[ 3487.12 -  3493.24] lo que te va a tomar una cantidad que era de tiempo, o sea, a lo mejor, y esa parte,
+[ 3493.24 -  3497.44] a lo mejor, y no podemos automatizar esa parte o hacerlo más rápido, pero a lo mejor,
+[ 3497.44 -  3500.04] lo te daré parte, sí.
+[ 3500.04 -  3505.61] Igual, te quiten tiempo del total.
+[ 3505.61 -  3510.73] Entonces, nunca vamos a decir a él que viene yo y lo podríamos avisar, digamos.
+[ 3510.73 -  3514.13] En caso de que necesitamos algún material o algo para hacer como prueba,
+[ 3514.29 -  3526.58] ok, igual, no, nada más para comentarles, porque ahorita les dejó el fútil, pero ya
+[ 3526.58 -  3528.58] completo con el fútil.
+[ 3528.58 -  3531.58] Sí, muchas gracias.
+[ 3531.58 -  3541.47] Y ya, creo que necesitamos facturas como para hacer algunos pruebas, porque necesitamos.
+[ 3541.47 -  3544.47] Ok, muchas gracias.
+[ 3544.47 -  3547.47] Perfecto, lo veréis de aquí.
+[ 3548.27 -  3550.27] Buen día.
+[ 3550.27 -  3551.27] Igualmente lo mejor.
