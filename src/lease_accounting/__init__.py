@@ -1,0 +1,2 @@
+"""Lease accounting application package."""
+

@@ -4,8 +4,11 @@ This repo keeps the runtime code easy to find while separating operational data,
 
 ## Code
 
-- `app.py`: Flask entrypoint
-- `pipeline/`: processing logic and PDF/XML parsing
+- `app.py`: thin compatibility entrypoint that loads the app from `src/`
+- `src/lease_accounting/`: main application package
+- `src/lease_accounting/web.py`: Flask app and routes
+- `src/lease_accounting/pipeline/`: processing logic and PDF/XML parsing
+- `pipeline/`: compatibility wrappers for older imports
 - `templates/`: HTML views
 - `static/`: CSS and browser assets
 - `scripts/`: maintenance and workbook preparation scripts
@@ -35,3 +38,4 @@ This repo keeps the runtime code easy to find while separating operational data,
 - Keep generated outputs and scratch files out of Git.
 - Keep code changes isolated from working files used by the current process.
 - When adding a new artifact, decide first whether it is source, support, or temporary.
+- Prefer adding new runtime code under `src/lease_accounting/` so the root stays as small as possible.

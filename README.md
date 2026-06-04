@@ -38,7 +38,7 @@ Expected names are flexible, but the app should be able to detect these concepts
 - `Invoice_Date`
 - `CECO`
 
-Use [sample_invoices.csv](/c:/Users/julio/OneDrive/Escritorio/Essilor/Arriendos/sample_invoices.csv) as a template if needed.
+Use `sample_invoices.csv` as a template if needed.
 
 ## Scope covered
 
@@ -50,7 +50,15 @@ Use [sample_invoices.csv](/c:/Users/julio/OneDrive/Escritorio/Essilor/Arriendos/
 - Distribution handling for special vendors
 - Consolidated output generation for downstream operation
 
-See [SOP_SCOPE.md](/c:/Users/julio/OneDrive/Escritorio/Essilor/Arriendos/SOP_SCOPE.md) for the project scope summary.
+See `SOP_SCOPE.md` for the project scope summary.
+
+## Project structure
+
+- `app.py`: thin wrapper that keeps the old entrypoint working
+- `src/lease_accounting/`: main application package
+- `src/lease_accounting/web.py`: Flask routes and upload flow
+- `src/lease_accounting/pipeline/`: pipeline and support parsing logic
+- `pipeline/`: compatibility layer for older imports
 
 ## Out of scope
 
