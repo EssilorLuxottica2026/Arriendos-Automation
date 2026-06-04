@@ -1,5 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
+import shutil
+from datetime import datetime
 
 from flask import (
     Flask,
@@ -19,6 +21,8 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 OUTPUT_DIR = DATA_DIR / "output"
+INPUT_DIR = DATA_DIR / "input"
+RAW_DIR = DATA_DIR / "raw"
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".csv"}
 SUPPORT_EXTENSIONS = {".pdf", ".xml"}
 
@@ -34,6 +38,19 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 DATA_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+INPUT_DIR.mkdir(exist_ok=True)
+RAW_DIR.mkdir(exist_ok=True)
+
+
+# Standard filenames for reference databases
+MASTER_FILENAMES = {
+    "control_file": "CONTROL_ARRI_ADMON.xlsx",
+    "contracts_file": "Contratos_con_condiciones.xlsx",
+    "prorateo_file": "PRORATEO.xlsx",
+    "distribution_file": "Cuadro_de_distribucion.xls",
+    "history_file": "FACTURAS_CONTABILIZADAS.xlsx",
+    "macro_workbook_file": "Arriendos_Macro.xlsm"
+}
 
 
 def _allowed(filename: str, allowed_extensions: set[str] | None = None) -> bool:
@@ -54,6 +71,42 @@ def _save_upload(file_storage, batch_dir: Path, allowed_extensions: set[str] | N
     return target
 
 
+def _resolve_and_save_master(key: str, file_storage, batch_dir: Path) -> Path | None:
+    standard_name = MASTER_FILENAMES.get(key)
+    if not standard_name:
+        return None
+
+    # If the user uploaded a new version of the file:
+    if file_storage and file_storage.filename:
+        temp_path = _save_upload(file_storage, batch_dir)
+        target_master_path = INPUT_DIR / standard_name
+        
+        # If the file already exists in data/input, back it up to data/raw/
+        if target_master_path.exists():
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            stem = target_master_path.stem
+            suffix = target_master_path.suffix
+            backup_name = f"{stem}_replaced_{timestamp}{suffix}"
+            
+            backup_path = RAW_DIR / backup_name
+            shutil.move(str(target_master_path), str(backup_path))
+        
+        # Copy the new file to data/input
+        shutil.copy2(str(temp_path), str(target_master_path))
+        return target_master_path
+
+    # If the user did NOT upload a file, check if it exists in data/input/
+    target_master_path = INPUT_DIR / standard_name
+    if target_master_path.exists():
+        return target_master_path
+
+    # If it is a required master file but doesn't exist anywhere
+    if key in ["control_file", "contracts_file", "prorateo_file", "distribution_file"]:
+        raise PipelineError(f"El archivo maestro obligatorio '{standard_name}' no se encuentra en el servidor. Por favor, súbelo al menos una vez.")
+        
+    return None
+
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -61,16 +114,9 @@ def index():
 
 @app.route("/process", methods=["POST"])
 def process():
-    required_keys = [
-        "control_file",
-        "contracts_file",
-        "prorateo_file",
-        "distribution_file",
-        "invoices_file",
-    ]
-    missing = [key for key in required_keys if key not in request.files or not request.files[key].filename]
-    if missing:
-        flash("Please upload all required files before processing.")
+    invoices_file = request.files.get("invoices_file")
+    if not invoices_file or not invoices_file.filename:
+        flash("Por favor, sube el archivo de facturas consolidado (Invoices file).")
         return redirect(url_for("index"))
 
     batch_id = uuid4().hex
@@ -78,11 +124,16 @@ def process():
     batch_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        files = {key: _save_upload(request.files[key], batch_dir) for key in required_keys}
-        optional_history = request.files.get("history_file")
-        history_path = _save_upload(optional_history, batch_dir) if optional_history and optional_history.filename else None
-        optional_macro = request.files.get("macro_workbook_file")
-        macro_workbook_path = _save_upload(optional_macro, batch_dir) if optional_macro and optional_macro.filename else None
+        invoices_path = _save_upload(invoices_file, batch_dir)
+        
+        control_path = _resolve_and_save_master("control_file", request.files.get("control_file"), batch_dir)
+        contracts_path = _resolve_and_save_master("contracts_file", request.files.get("contracts_file"), batch_dir)
+        prorateo_path = _resolve_and_save_master("prorateo_file", request.files.get("prorateo_file"), batch_dir)
+        distribution_path = _resolve_and_save_master("distribution_file", request.files.get("distribution_file"), batch_dir)
+        
+        history_path = _resolve_and_save_master("history_file", request.files.get("history_file"), batch_dir)
+        macro_workbook_path = _resolve_and_save_master("macro_workbook_file", request.files.get("macro_workbook_file"), batch_dir)
+
         support_paths = []
         for support_file in request.files.getlist("invoice_support_files"):
             if support_file and support_file.filename:
@@ -91,11 +142,11 @@ def process():
         period = request.form.get("period", "").strip()
         pipeline = LeaseAccountingPipeline(output_dir=OUTPUT_DIR)
         result = pipeline.run(
-            invoices_path=files["invoices_file"],
-            control_path=files["control_file"],
-            contracts_path=files["contracts_file"],
-            prorateo_path=files["prorateo_file"],
-            distribution_path=files["distribution_file"],
+            invoices_path=invoices_path,
+            control_path=control_path,
+            contracts_path=contracts_path,
+            prorateo_path=prorateo_path,
+            distribution_path=distribution_path,
             history_path=history_path,
             support_paths=support_paths,
             macro_template_path=macro_workbook_path,
