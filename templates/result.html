@@ -1,38 +1,163 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Processing Complete</title>
+    <title>Procesamiento Completado</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <main class="page">
-        <section class="panel">
-            <p class="eyebrow">Processing Complete</p>
-            <h1>Your accounting files are ready</h1>
+        <!-- CABECERA DE ÉXITO -->
+        <section class="panel success-header">
+            <div class="success-icon-wrapper">
+                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h1>¡Archivos procesados con éxito!</h1>
             <p class="lede">
-                {{ result.output_rows }} accounting summary rows, {{ result.header_rows }} header rows, and {{ result.validation_rows }} validation rows were generated.
+                Las reglas de negocio se aplicaron de forma correcta. Se cruzaron los NITs, vigencias de contratos y prorrateos de IVA.
             </p>
+        </section>
 
-            <div class="actions">
-                <a class="button-link" href="{{ url_for('download', filename=result.output_excel) }}">Download Excel output</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.output_csv) }}">Download Allocated Costs CSV</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.header_csv) }}">Download Header CSV</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.invoice_csv_bundle) }}">Download invoice CSV bundle</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.manual_style_csv_bundle) }}">Download manual-style CSV bundle</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.validation_excel) }}">Download validation report</a>
-                <a class="button-link" href="{{ url_for('download', filename=result.normalized_invoices_excel) }}">Download normalized invoices</a>
+        <!-- INDICADORES / METRICAS -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-value">{{ result.output_rows }}</div>
+                <div class="stat-label">Filas Contables</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ result.header_rows }}</div>
+                <div class="stat-label">Cabeceras (Headers)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ result.validation_rows }}</div>
+                <div class="stat-label">Alertas de Auditoría</div>
+            </div>
+        </div>
+
+        <!-- REJILLA DE DESCARGAS -->
+        <section class="panel">
+            <h2>Descargas Disponibles</h2>
+            <div class="downloads-grid">
+                
+                <!-- EXCEL PRINCIPAL -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Excel Integrado Lucy/SAP</div>
+                        <div class="download-desc">Contiene todas las pestañas de resumen, cabeceras, líneas contables y matrices listas para auditar.</div>
+                    </div>
+                    <a class="button-link primary" href="{{ url_for('download', filename=result.output_excel) }}">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar Excel Principal
+                    </a>
+                </div>
+
+                <!-- CSV LINEAS CONTABLES -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">allocated costs CSV</div>
+                        <div class="download-desc">Líneas contables individuales con sus cuentas contables y textos listos para subir.</div>
+                    </div>
+                    <a class="button-link" href="{{ url_for('download', filename=result.output_csv) }}">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar CSV Líneas
+                    </a>
+                </div>
+
+                <!-- CSV CABECERAS -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Header CSV</div>
+                        <div class="download-desc">Datos de cabeceras de facturación requeridos por Lucy en formato de texto.</div>
+                    </div>
+                    <a class="button-link" href="{{ url_for('download', filename=result.header_csv) }}">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar CSV Cabeceras
+                    </a>
+                </div>
+
+                <!-- REPORTE VALIDACIONES -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Reporte de Auditoría y Alertas</div>
+                        <div class="download-desc">Revisa descuadres de IVA, NITs no reconocidos y contratos expirados antes de subir.</div>
+                    </div>
+                    <a class="button-link" href="{{ url_for('download', filename=result.validation_excel) }}">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Descargar Validaciones
+                    </a>
+                </div>
+
+                <!-- BUNDLE INDIVIDUAL -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Zips de Facturas Individuales</div>
+                        <div class="download-desc">Paquetes comprimidos ZIP que desglosan cada factura por separado en formato individual.</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-direction: column;">
+                        <a class="button-link" style="padding: 8px 12px; font-size: 0.85rem;" href="{{ url_for('download', filename=result.invoice_csv_bundle) }}">
+                            CSV Bundle
+                        </a>
+                        <a class="button-link" style="padding: 8px 12px; font-size: 0.85rem;" href="{{ url_for('download', filename=result.manual_style_csv_bundle) }}">
+                            CSV Estilo Manual
+                        </a>
+                    </div>
+                </div>
+
+                <!-- SNAPSHOT NORMALIZADO -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Insumos Normalizados</div>
+                        <div class="download-desc">El listado de facturas tras el proceso de estandarización de columnas y NITs inicial.</div>
+                    </div>
+                    <a class="button-link" href="{{ url_for('download', filename=result.normalized_invoices_excel) }}">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                        Descargar Normalizado
+                    </a>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TERMINAL DE LOGS -->
+        <section class="panel">
+            <h2>Mapa de Ejecución (Logs Detallados)</h2>
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="terminal-dot red"></div>
+                    <div class="terminal-dot yellow"></div>
+                    <div class="terminal-dot green"></div>
+                    <div class="terminal-title">pipeline.log</div>
+                </div>
+                <div class="log-terminal">
+                    {% for item in result.logs %}
+                        {% set cls = "info-log" %}
+                        {% if "Support File parsed" in item %}
+                            {% set cls = "support-log" %}
+                        {% elif "Standardized" in item %}
+                            {% set cls = "info-log" %}
+                        {% elif "Merging completed" in item or "Matched variables" in item or "Merging invoices" in item %}
+                            {% set cls = "merge-log" %}
+                        {% elif "Evaluated business rules" in item or "vs EndOfTerm" in item %}
+                            {% set cls = "rules-log" %}
+                        {% elif "matched distribution rule" in item or "Split Target Vendor" in item %}
+                            {% set cls = "split-log" %}
+                        {% elif "Writing" in item or "saved" in item or "complete execution log" in item %}
+                            {% set cls = "write-log" %}
+                        {% endif %}
+                        <div class="log-line {{ cls }}">{{ item }}</div>
+                    {% endfor %}
+                </div>
             </div>
 
-            <h2>Pipeline log</h2>
-            <ul class="log-list">
-                {% for item in result.logs %}
-                    <li>{{ item }}</li>
-                {% endfor %}
-            </ul>
-
-            <a class="back-link" href="{{ url_for('index') }}">Process another batch</a>
+            <div class="back-action-container">
+                <a class="back-link-btn" href="{{ url_for('index') }}">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <span>Procesar otro lote</span>
+                </a>
+            </div>
         </section>
     </main>
 </body>

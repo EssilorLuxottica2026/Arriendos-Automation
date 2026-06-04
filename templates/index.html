@@ -1,101 +1,177 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Lease Accounting Pipeline</title>
+    <title>Automatización de Contabilidad de Arriendos</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <main class="page">
-        <section class="panel hero">
-            <p class="eyebrow">Lease Accounting Automation</p>
-            <h1>Upload the files and generate the Lucy/SAP-ready output</h1>
+        <header class="hero">
+            <p class="eyebrow">Automatización de Arriendos</p>
+            <h1>Pre-contabilización de Facturas Manuales</h1>
             <p class="lede">
-                This app reads lease invoice data, enriches it with the reference workbooks,
-                calculates VAT splits, applies vendor distributions, and exports a ready-to-use accounting file.
+                Carga los archivos fuentes del mes para cruzar cecos, verificar contratos vigentes, 
+                prorratear el IVA y generar las cabeceras e importes listos para Lucy/SAP.
             </p>
-            <p class="lede">
-                Scope aligned with SOP `Arrendamientos - Facturas Manuales`: automate preparation, validation,
-                contract review, VAT proration, account determination, and consolidated output generation before posting.
-            </p>
-        </section>
+        </header>
 
-        <section class="panel">
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="alerts">
-                        {% for message in messages %}
-                            <div class="alert">{{ message }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alerts">
+                    {% for message in messages %}
+                        <div class="alert alert-error">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
 
-            <form action="{{ url_for('process') }}" method="post" enctype="multipart/form-data" class="upload-form">
+        <form action="{{ url_for('process') }}" method="post" enctype="multipart/form-data" class="upload-form">
+            
+            <!-- SECCIÓN 1: ARCHIVOS OBLIGATORIOS -->
+            <section class="panel">
+                <div class="section-title-wrapper">
+                    <h2>1. Archivos Obligatorios (Insumos Base)</h2>
+                </div>
                 <div class="grid">
-                    <label>
-                        <span>Invoices file from email</span>
-                        <input type="file" name="invoices_file" accept=".xlsx,.xls,.csv" required>
-                    </label>
-                    <label>
-                        <span>CONTROL ARRI ADMON</span>
-                        <input type="file" name="control_file" accept=".xlsx,.xls" required>
-                    </label>
-                    <label>
-                        <span>Contratos con condiciones</span>
-                        <input type="file" name="contracts_file" accept=".xlsx,.xls" required>
-                    </label>
-                    <label>
-                        <span>PRORATEO</span>
-                        <input type="file" name="prorateo_file" accept=".xlsx,.xls" required>
-                    </label>
-                    <label>
-                        <span>Cuadro de distribucion</span>
-                        <input type="file" name="distribution_file" accept=".xlsx,.xls" required>
-                    </label>
-                    <label>
-                        <span>FACTURAS CONTABILIZADAS (optional)</span>
-                        <input type="file" name="history_file" accept=".xlsx,.xls,.xlsm,.csv">
-                    </label>
-                    <label>
-                        <span>Macro workbook reference (optional)</span>
-                        <input type="file" name="macro_workbook_file" accept=".xlsm,.xlsx,.xls">
-                    </label>
-                    <label>
-                        <span>Invoice support files PDF/XML (optional)</span>
-                        <input type="file" name="invoice_support_files" accept=".pdf,.xml" multiple>
-                    </label>
-                    <label>
-                        <span>Period `MM-YYYY`</span>
-                        <input type="text" name="period" placeholder="03-2026">
-                    </label>
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Factura consolidada (Excel/CSV)</span>
+                            <span class="required-badge">*</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="invoices_file" accept=".xlsx,.xls,.csv" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            <span>CONTROL ARRI ADMON</span>
+                            <span class="required-badge">*</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="control_file" accept=".xlsx,.xls" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span>Contratos con condiciones</span>
+                            <span class="required-badge">*</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="contracts_file" accept=".xlsx,.xls" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span>PRORATEO de IVA</span>
+                            <span class="required-badge">*</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="prorateo_file" accept=".xlsx,.xls" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <span>Cuadro de distribución</span>
+                            <span class="required-badge">*</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="distribution_file" accept=".xlsx,.xls" required>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN 2: ARCHIVOS OPCIONALES Y CONFIGURACIÓN -->
+            <section class="panel">
+                <div class="section-title-wrapper">
+                    <h2>2. Soportes Adicionales y Configuración</h2>
+                </div>
+                <div class="grid">
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>Facturas contabilizadas (Histórico)</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="history_file" accept=".xlsx,.xls,.xlsm,.csv">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                            <span>Plantilla base de Macros (.xlsm)</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="macro_workbook_file" accept=".xlsm,.xlsx,.xls">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                            <span>Soportes en PDF / XML (Múltiple)</span>
+                        </div>
+                        <div class="file-input-wrapper">
+                            <input type="file" name="invoice_support_files" accept=".pdf,.xml" multiple>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-label">
+                            <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span>Período contable (MM-AAAA)</span>
+                        </div>
+                        <input type="text" name="period" class="text-input-field" placeholder="Ej: 05-2026">
+                    </div>
                 </div>
 
-                <div class="helper">
-                    The app accepts the raw invoice Excel as received by email. It will normalize fields like
-                    `store`, `ceco`, `invoice_id`, `vendor`, and `total` internally before crossing them with the
-                    support workbooks and PDFs.
+                <div class="form-helpers">
+                    <div class="helper-card">
+                        <strong>Limpieza e Integración:</strong>
+                        El sistema normaliza columnas como <code>tienda</code>, <code>nit</code> y <code>valor</code> para cruzarlas sin importar el desorden original.
+                    </div>
+                    <div class="helper-card">
+                        <strong>Lectura de PDF/XML:</strong>
+                        Si cargas archivos PDF o XML del proveedor, el lector extraerá fechas, subtotales, retenciones y número de factura para corregir o completar el Excel.
+                    </div>
+                    <div class="helper-card">
+                        <strong>VBA y Estructuras:</strong>
+                        Si subes la macro base, el sistema inyectará los datos directamente en el layout esperado para no romper el Excel original que el equipo contable ya domina.
+                    </div>
                 </div>
 
-                <div class="helper">
-                    This app does not post into Lucy/SAP, validate retentions in SAP, or execute compensations like `F-44`.
-                    It prepares the accounting-ready file for manual operation or future RPA.
-                </div>
-
-                <div class="helper">
-                    When available, upload invoice PDFs or XML electronic invoices as support files. The app will try to extract
-                    `invoice_id`, `invoice_date`, `due_date`, subtotal, total, IVA, payment terms, and item counts to enrich the `Invoices file`.
-                </div>
-
-                <div class="helper">
-                    If you upload the macro workbook, the app will use its `lucy` sheet as the reference layout for
-                    the final CSV export, so the output stays as close as possible to the file the team already uses.
-                </div>
-
-                <button type="submit">Process files</button>
-            </form>
-        </section>
+                <button type="submit" id="submitBtn">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <span>Procesar archivos</span>
+                </button>
+            </section>
+        </form>
     </main>
+
+    <script>
+        document.querySelector('form').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            btn.classList.add('loading');
+            btn.querySelector('span').textContent = 'Procesando información...';
+            btn.style.pointerEvents = 'none';
+        });
+    </script>
 </body>
 </html>
