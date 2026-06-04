@@ -223,8 +223,9 @@ class LeaseAccountingPipeline:
     HEADER_FONT = "FFFFFF"
 
     def __init__(self, output_dir: Path):
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.base_output_dir = Path(output_dir)
+        self.base_output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = self.base_output_dir
         self.logs: list[str] = []
         self.distribution_rules = pd.DataFrame()
 
@@ -241,6 +242,9 @@ class LeaseAccountingPipeline:
         period: str | None = None,
     ) -> dict:
         self.logs = []
+        run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M")
+        self.output_dir = self.base_output_dir / run_folder_name
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         data = self.load_data(
             invoices_path=invoices_path,
             control_path=control_path,
@@ -429,6 +433,21 @@ class LeaseAccountingPipeline:
             )
             macro_database["row_rank"] = macro_database.groupby(["vendor_key", "store_key"]).cumcount() + 1
 
+        self._log(f"Standardized {len(invoices)} invoices.")
+        for idx, row in invoices.iterrows():
+            support_log = ""
+            if "support_total" in row and pd.notna(row["support_total"]):
+                support_log = (
+                    f" | Matched PDF/XML support: Date={row.get('support_invoice_date')}, "
+                    f"Total={row.get('support_total')}, IVA={row.get('support_detected_iva')}, "
+                    f"Withholding={row.get('support_withholding_tax')}, "
+                    f"PaymentTerms={row.get('support_payment_terms_text')}"
+                )
+            self._log(
+                f"  Invoice [{row['invoice_id']}]: Vendor={row['vendor']}, Store={row['store']}, "
+                f"Date={row['invoice_date']}, Total={row['total']}, VAT={row['vat']}{support_log}"
+            )
+
         cleaned["invoices"] = invoices
         cleaned["control"] = control
         cleaned["contracts"] = contracts
@@ -520,6 +539,15 @@ class LeaseAccountingPipeline:
         merged["status_en_rem"] = merged["status_en_rem"].combine_first(merged["macro_status_en_rem"])
         merged["vw_percent"] = merged["vw_percent_vendor"].combine_first(merged["vw_percent_store"]).combine_first(merged["macro_vw_percent"])
         merged["profit_center"] = merged["macro_profit_center"].combine_first(merged["mapped_ceco"])
+        self._log(f"Merging completed. Matched variables for {len(merged)} invoice rows:")
+        for idx, row in merged.iterrows():
+            self._log(
+                f"  Invoice [{row['invoice_id']}]: Vendor={row['vendor']} -> "
+                f"Store={row['store']} (Mapped Store={row['mapped_store']}), "
+                f"CECO={row['ceco']} (Mapped CECO={row['mapped_ceco']}), "
+                f"Contract End={row['end_of_term']} (Rent Min={row['rent_min']}, Status={row['status_en_rem']}), "
+                f"Prorateo VW%={row['vw_percent']}, Profit Center={row['profit_center']}"
+            )
         return merged
 
     def apply_rules(self, merged: pd.DataFrame, period: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -540,6 +568,15 @@ class LeaseAccountingPipeline:
             self._build_text(date_value, rent_type, store, ceco)
             for date_value, rent_type, store, ceco in zip(period_dates, df["rent_type"], df["mapped_store"], df["mapped_ceco"])
         ]
+
+        self._log(f"Evaluated business rules for {len(df)} invoices:")
+        for idx, row in df.iterrows():
+            self._log(
+                f"  Invoice [{row['invoice_id']}]: Date {row['invoice_date']} vs EndOfTerm {row['end_of_term']} "
+                f"-> ContractActive={row['contract_active']} -> Class={row['rent_type']} -> Account={row['account']}. "
+                f"VAT={row['vat_total']} -> VW={row['vat_vw']} (using VW%={row['vw_percent']}), VQ={row['vat_vq']}. "
+                f"Withholding={row['withholding_tax_amount']}, Text='{row['text']}'"
+            )
 
         validation_df = self._build_validations(df)
         expanded = self._apply_distribution(df)
@@ -587,6 +624,14 @@ class LeaseAccountingPipeline:
         normalized_name = f"normalized_invoices_{timestamp}.xlsx"
 
         summary_df, headers_df, lines_df = self._build_lucy_views(output_df)
+        self._log(f"Writing {len(summary_df)} summary records to Lucy Excel/CSV:")
+        for idx, row in summary_df.iterrows():
+            self._log(
+                f"  Record [{row.get('invoice_id')}]: Vendor={row.get('vendor')}, "
+                f"CECO={row.get('ceco')}, Account={row.get('account')}, "
+                f"Amount={row.get('amount')}, VAT={row.get('vat_total')} (VW={row.get('vat_vw')}, VQ={row.get('vat_vq')}), "
+                f"Text='{row.get('text')}'"
+            )
         mapping_df = self._build_lucy_mapping(summary_df, headers_df, lines_df)
         header_export_df = self._build_header_export(summary_df)
         header_matrix_df = self._build_header_matrix()
@@ -655,15 +700,25 @@ class LeaseAccountingPipeline:
         ].copy()
         normalized_snapshot.to_excel(self.output_dir / normalized_name, index=False)
 
+        # Write execution logs to a physical log file inside self.output_dir
+        log_file_path = self.output_dir / "pipeline.log"
+        try:
+            self.logs.append(f"Writing complete execution log to: {log_file_path.name}")
+            with open(log_file_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(self.logs))
+        except Exception as exc:
+            LOGGER.error(f"Failed to write pipeline log file: {exc}")
+
+        run_folder_name = self.output_dir.name
         return PipelineResult(
-            output_excel=excel_name,
-            output_excel_fixed=excel_fixed_name,
-            output_csv=csv_name,
-            header_csv=header_csv_name,
-            invoice_csv_bundle=invoice_bundle_name,
-            manual_style_csv_bundle=manual_style_bundle_name,
-            validation_excel=validation_name,
-            normalized_invoices_excel=normalized_name,
+            output_excel=f"{run_folder_name}/{excel_name}",
+            output_excel_fixed=f"{run_folder_name}/{excel_fixed_name}",
+            output_csv=f"{run_folder_name}/{csv_name}",
+            header_csv=f"{run_folder_name}/{header_csv_name}",
+            invoice_csv_bundle=f"{run_folder_name}/{invoice_bundle_name}",
+            manual_style_csv_bundle=f"{run_folder_name}/{manual_style_bundle_name}",
+            validation_excel=f"{run_folder_name}/{validation_name}",
+            normalized_invoices_excel=f"{run_folder_name}/{normalized_name}",
             output_rows=len(summary_df),
             header_rows=len(header_export_df),
             validation_rows=len(validation_df),
@@ -674,7 +729,15 @@ class LeaseAccountingPipeline:
         if not support_paths:
             return pd.DataFrame()
         self._log(f"Parsing {len(support_paths)} invoice support files (PDF/XML).")
-        return InvoiceSupportReader().parse_many(support_paths)
+        df = InvoiceSupportReader().parse_many(support_paths)
+        for _, row in df.iterrows():
+            self._log(
+                f"  Support File parsed: {row['source_file']} ({row['source_type'].upper()}) -> "
+                f"Invoice_ID: {row['invoice_id']}, Date: {row['invoice_date']}, "
+                f"Subtotal: {row['subtotal']}, Total: {row['total']}, VAT: {row['detected_iva']}, "
+                f"Withholding: {row['withholding_tax']}, Flags: {row['flags']}"
+            )
+        return df
 
     def _load_invoices(self, path: Path) -> pd.DataFrame:
         df = self._safe_read_table(path)
@@ -864,6 +927,11 @@ class LeaseAccountingPipeline:
             if total_pct <= 0:
                 total_pct = 1.0
 
+            self._log(
+                f"  Invoice [{row['invoice_id']}]: Vendor {row['mapped_vendor']} matched distribution rule. "
+                f"Splitting original amount {row['amount']} into {len(valid_matches)} targets:"
+            )
+
             for _, split in valid_matches.iterrows():
                 factor = split["split_percent"] / total_pct
                 new_row = row.copy()
@@ -876,6 +944,10 @@ class LeaseAccountingPipeline:
                 new_row["vat_vq"] = round((row["vat_vq"] or 0) * factor, 2)
                 new_row["withholding_tax_amount"] = round((row.get("withholding_tax_amount") or 0) * factor, 2)
                 expanded_rows.append(new_row)
+                self._log(
+                    f"    -> Split Target Vendor: {new_row['vendor']} | Share: {split['split_percent']*100}% | "
+                    f"Allocated Amount: {new_row['amount']} | Allocated VAT: {new_row['vat_total']}"
+                )
 
         return pd.DataFrame(expanded_rows)
 
