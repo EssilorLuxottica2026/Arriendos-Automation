@@ -23,7 +23,7 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 OUTPUT_DIR = DATA_DIR / "output"
 INPUT_DIR = DATA_DIR / "input"
 RAW_DIR = DATA_DIR / "raw"
-ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".csv"}
+ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".csv", ".xml"}
 SUPPORT_EXTENSIONS = {".pdf", ".xml"}
 
 

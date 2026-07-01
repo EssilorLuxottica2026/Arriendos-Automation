@@ -12,6 +12,8 @@ class ParsedInvoiceSupport:
     source_file: str
     source_type: str
     invoice_id: str | None
+    supplier_id: str | None
+    supplier_name: str | None
     invoice_date: pd.Timestamp | None
     due_date: pd.Timestamp | None
     subtotal: float | None
@@ -20,6 +22,7 @@ class ParsedInvoiceSupport:
     withholding_tax: float | None
     payment_terms_text: str | None
     item_count_hint: int | None
+    line_items: list[dict]
     has_zero_iva_hint: bool
     text_excerpt: str
     flags: str | None
@@ -67,6 +70,8 @@ class InvoiceSupportReader:
             "source_file",
             "source_type",
             "invoice_id",
+            "supplier_id",
+            "supplier_name",
             "invoice_date",
             "due_date",
             "subtotal",
@@ -75,6 +80,7 @@ class InvoiceSupportReader:
             "withholding_tax",
             "payment_terms_text",
             "item_count_hint",
+            "line_items",
             "has_zero_iva_hint",
             "text_excerpt",
             "flags",
@@ -126,6 +132,8 @@ class InvoiceSupportReader:
             source_file=path.name,
             source_type="pdf",
             invoice_id=invoice_id,
+            supplier_id=None,
+            supplier_name=None,
             invoice_date=invoice_date,
             due_date=due_date,
             subtotal=subtotal,
@@ -134,6 +142,7 @@ class InvoiceSupportReader:
             withholding_tax=withholding_tax,
             payment_terms_text=payment_terms_text,
             item_count_hint=item_count_hint,
+            line_items=[],
             has_zero_iva_hint=has_zero_iva_hint,
             text_excerpt=text[:500],
             flags="|".join(flags) if flags else None,
@@ -142,6 +151,11 @@ class InvoiceSupportReader:
     def _parse_xml_file(self, path: Path) -> ParsedInvoiceSupport:
         invoice_root = self._extract_invoice_root_from_xml(path)
         invoice_id = self._find_text(invoice_root, "./cbc:ID")
+        supplier_id = self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cbc:CompanyID")
+        supplier_name = (
+            self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cac:PartyName/cbc:Name")
+            or self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cbc:RegistrationName")
+        )
         invoice_date = self._parse_date_value(self._find_text(invoice_root, "./cbc:IssueDate"))
         due_date = self._parse_date_value(
             self._find_text(invoice_root, ".//cac:PaymentMeans/cbc:PaymentDueDate")
@@ -154,6 +168,7 @@ class InvoiceSupportReader:
         withholding_tax = self._extract_xml_withholding_tax(invoice_root)
         payment_terms_text = self._extract_xml_payment_terms(invoice_root)
         item_count_hint = self._extract_xml_item_count(invoice_root)
+        line_items = self._extract_xml_line_items(invoice_root)
         text_excerpt = self._build_xml_excerpt(invoice_root)
 
         flags = []
@@ -168,6 +183,8 @@ class InvoiceSupportReader:
             source_file=path.name,
             source_type="xml",
             invoice_id=invoice_id,
+            supplier_id=supplier_id,
+            supplier_name=supplier_name,
             invoice_date=invoice_date,
             due_date=due_date,
             subtotal=subtotal,
@@ -176,6 +193,7 @@ class InvoiceSupportReader:
             withholding_tax=withholding_tax,
             payment_terms_text=payment_terms_text,
             item_count_hint=item_count_hint,
+            line_items=line_items,
             has_zero_iva_hint=has_zero_iva_hint,
             text_excerpt=text_excerpt[:500],
             flags="|".join(flags) if flags else None,
@@ -260,6 +278,63 @@ class InvoiceSupportReader:
             return int(line_count)
         lines = root.findall(".//cac:InvoiceLine", self.XML_NS)
         return len(lines) or None
+
+    def _extract_xml_line_items(self, root: ET.Element) -> list[dict]:
+        items = []
+        for line in root.findall(".//cac:InvoiceLine", self.XML_NS):
+            line_id = self._find_text(line, "./cbc:ID")
+            description = self._extract_xml_line_description(line)
+            amount = self._parse_number(self._find_text(line, "./cbc:LineExtensionAmount"))
+            tax_amount = self._parse_number(self._find_text(line, ".//cac:TaxTotal/cbc:TaxAmount"))
+            quantity = self._parse_number(self._find_text(line, "./cbc:InvoicedQuantity"))
+            if description is None and amount is None:
+                continue
+            items.append(
+                {
+                    "line_id": line_id,
+                    "description": description,
+                    "amount": amount,
+                    "tax_amount": tax_amount,
+                    "quantity": quantity,
+                }
+            )
+        return items
+
+    def _extract_xml_line_description(self, line: ET.Element) -> str | None:
+        description = self._find_text(line, ".//cac:Item/cbc:Description")
+        if self._is_useful_xml_description(description):
+            return description
+
+        notes = [
+            (note.text or "").strip()
+            for note in line.findall("./cbc:Note", self.XML_NS)
+            if (note.text or "").strip()
+        ]
+        for note in notes:
+            budget_match = re.search(
+                r"\bPpto:\s*(.*?)(?:\s+Coefic_|\s+Vlr_Ppto_Anual|\s+Div\s+en:|[|/\n\r]|$)",
+                note,
+                flags=re.IGNORECASE,
+            )
+            if budget_match:
+                candidate = budget_match.group(1).strip()
+                if self._is_useful_xml_description(candidate):
+                    return candidate
+        for note in notes:
+            if self._is_useful_xml_description(note):
+                return note
+
+        item_id = (
+            self._find_text(line, ".//cac:SellersItemIdentification/cbc:ID")
+            or self._find_text(line, ".//cac:StandardItemIdentification/cbc:ID")
+        )
+        return item_id if self._is_useful_xml_description(item_id) else None
+
+    def _is_useful_xml_description(self, value: str | None) -> bool:
+        if value is None:
+            return False
+        text = re.sub(r"\s+", " ", value).strip()
+        return bool(text and text not in {".", "-", "--", "_", "N/A", "NA"})
 
     def _build_xml_excerpt(self, root: ET.Element) -> str:
         parts = []
