@@ -215,6 +215,78 @@ h2::before {
     box-shadow: 0 0 15px var(--accent-glow);
 }
 
+.tag-input {
+    width: 100%;
+    min-height: 52px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.tag-input:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.phrase-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    background: rgba(20, 184, 166, 0.18);
+    color: #a5f3fc;
+    border: 1px solid rgba(20, 184, 166, 0.45);
+    border-radius: 999px;
+    padding: 6px 10px 6px 12px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.phrase-tag-remove {
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(8, 145, 178, 0.65);
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 0.78rem;
+    line-height: 18px;
+    padding: 0;
+}
+
+.phrase-tag-remove:hover {
+    background: var(--danger);
+}
+
+.tag-entry {
+    min-width: 180px;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    padding: 6px;
+}
+
+.tag-entry::placeholder {
+    color: var(--text-muted);
+}
+
 /* Helpers & Info Callouts */
 .form-helpers {
     display: grid;
