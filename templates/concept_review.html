@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Revisión de Conceptos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page">
+        <section class="panel">
+            <h1>Revisión de conceptos</h1>
+            <p class="lede">
+                La app encontró descripciones que todavía no están en el diccionario. Elige el concepto correcto y escribe la frase o palabra que debe recordar para futuras facturas.
+            </p>
+        </section>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alerts">
+                    {% for message in messages %}
+                        <div class="alert alert-error">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('concept_review', batch_id=batch_id) }}" method="post" class="upload-form">
+            <section class="panel">
+                <h2>Items pendientes</h2>
+                <input type="hidden" name="item_count" value="{{ items|length }}">
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left; padding: 10px;">Descripción</th>
+                                <th style="text-align:left; padding: 10px;">Ejemplos</th>
+                                <th style="text-align:left; padding: 10px;">Concepto</th>
+                                <th style="text-align:left; padding: 10px;">Frase/palabra a guardar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                                {% set idx = loop.index0 %}
+                                <tr>
+                                    <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 260px;">
+                                        <strong>{{ item.description }}</strong>
+                                        <div style="color: var(--text-secondary); font-size: .85rem; margin-top: 6px;">
+                                            {{ item.count }} ocurrencia(s), total {{ "%.2f"|format(item.total_amount) }}
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 220px;">
+                                        {% for example in item.examples %}
+                                            <div style="font-size: .85rem; margin-bottom: 6px;">
+                                                Factura {{ example.invoice_id }} · {{ example.store }} · CECO {{ example.ceco }} · {{ example.amount }}
+                                            </div>
+                                        {% endfor %}
+                                    </td>
+                                    <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 180px;">
+                                        <select name="concept_{{ idx }}" required class="text-input-field">
+                                            <option value="">Seleccionar...</option>
+                                            {% for concept in concepts %}
+                                                <option value="{{ concept.concept }}">{{ concept.concept }}{% if concept.account %} · {{ concept.account }}{% endif %}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 280px;">
+                                        <input type="text" name="phrase_{{ idx }}" class="text-input-field" value="{{ item.suggested_phrase }}" required>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-helpers">
+                    <div class="helper-card">
+                        La frase guardada se agrega a <code>Diccionario_Conceptos_Simple.xlsx</code>. En la siguiente corrida, la app intentará clasificar automáticamente usando primero las frases más específicas.
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn">
+                    <span>Guardar reglas y generar CSV</span>
+                </button>
+            </section>
+        </form>
+    </main>
+    <script>
+        document.querySelector('form').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            btn.classList.add('loading');
+            btn.querySelector('span').textContent = 'Guardando y procesando...';
+            btn.style.pointerEvents = 'none';
+        });
+    </script>
+</body>
+</html>

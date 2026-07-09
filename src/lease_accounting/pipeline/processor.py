@@ -300,12 +300,16 @@ class LeaseAccountingPipeline:
     HEADER_FILL = "1F2937"
     HEADER_FONT = "FFFFFF"
 
-    def __init__(self, output_dir: Path):
+    DEFAULT_LEARNING_DICTIONARY = Path(__file__).resolve().parents[3] / "Diccionario_Conceptos_Simple.xlsx"
+
+    def __init__(self, output_dir: Path, learning_dictionary_path: Path | None = None):
         self.base_output_dir = Path(output_dir)
         self.base_output_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir = self.base_output_dir
         self.logs: list[str] = []
         self.distribution_rules = pd.DataFrame()
+        self.learning_dictionary_path = Path(learning_dictionary_path) if learning_dictionary_path else self.DEFAULT_LEARNING_DICTIONARY
+        self.learning_dictionary = pd.DataFrame()
 
     def run(
         self,
@@ -316,6 +320,7 @@ class LeaseAccountingPipeline:
         distribution_path: Path,
         history_path: Path | None = None,
         support_paths: list[Path] | None = None,
+        support_split_factors: dict[str, int] | None = None,
         macro_template_path: Path | None = None,
         period: str | None = None,
     ) -> dict:
@@ -323,6 +328,40 @@ class LeaseAccountingPipeline:
         run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M")
         self.output_dir = self.base_output_dir / run_folder_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        data, output_df, validation_df = self.prepare(
+            invoices_path=invoices_path,
+            control_path=control_path,
+            contracts_path=contracts_path,
+            prorateo_path=prorateo_path,
+            distribution_path=distribution_path,
+            history_path=history_path,
+            support_paths=support_paths,
+            support_split_factors=support_split_factors,
+            macro_template_path=macro_template_path,
+            period=period,
+        )
+        return self.generate_output(
+            output_df,
+            validation_df,
+            data["invoices"],
+            macro_database_df=data.get("macro_database", pd.DataFrame()),
+            macro_template_path=macro_template_path,
+        ).to_dict()
+
+    def prepare(
+        self,
+        invoices_path: Path,
+        control_path: Path,
+        contracts_path: Path,
+        prorateo_path: Path,
+        distribution_path: Path,
+        history_path: Path | None = None,
+        support_paths: list[Path] | None = None,
+        support_split_factors: dict[str, int] | None = None,
+        macro_template_path: Path | None = None,
+        period: str | None = None,
+    ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame]:
+        self.learning_dictionary = self._load_learning_dictionary(self.learning_dictionary_path)
         data = self.load_data(
             invoices_path=invoices_path,
             control_path=control_path,
@@ -331,18 +370,13 @@ class LeaseAccountingPipeline:
             distribution_path=distribution_path,
             history_path=history_path,
             support_paths=support_paths,
+            support_split_factors=support_split_factors,
             macro_template_path=macro_template_path,
         )
         data = self.clean_data(data)
         merged = self.merge_data(data)
         output_df, validation_df = self.apply_rules(merged, period=period)
-        return self.generate_output(
-            output_df,
-            validation_df,
-            data["invoices"],
-            macro_database_df=data.get("macro_database", pd.DataFrame()),
-            macro_template_path=macro_template_path,
-        ).to_dict()
+        return data, output_df, validation_df
 
     def load_data(
         self,
@@ -353,6 +387,7 @@ class LeaseAccountingPipeline:
         distribution_path: Path,
         history_path: Path | None = None,
         support_paths: list[Path] | None = None,
+        support_split_factors: dict[str, int] | None = None,
         macro_template_path: Path | None = None,
     ) -> dict[str, pd.DataFrame]:
         self._log("Loading input files.")
@@ -363,7 +398,7 @@ class LeaseAccountingPipeline:
             "prorateo": self._load_prorateo(prorateo_path),
             "distribution": self._load_distribution(distribution_path),
             "history": self._safe_read_table(history_path) if history_path else pd.DataFrame(),
-            "invoice_supports": self._load_invoice_supports(support_paths or []),
+            "invoice_supports": self._load_invoice_supports(support_paths or [], support_split_factors=support_split_factors),
             "macro_database": self._load_macro_database(macro_template_path) if macro_template_path else pd.DataFrame(),
         }
 
@@ -419,6 +454,27 @@ class LeaseAccountingPipeline:
         invoice_supports = cleaned["invoice_supports"]
         if not invoice_supports.empty:
             invoice_supports["invoice_key"] = invoice_supports["invoice_id"].map(self._invoice_key)
+            invoice_supports["split_factor"] = pd.to_numeric(invoice_supports.get("split_factor", 1), errors="coerce").fillna(1)
+            invoice_keys = set(invoices["invoice_pdf_key"].dropna())
+            unmatched_supports = invoice_supports[
+                invoice_supports["invoice_key"].fillna("").map(lambda key: key not in invoice_keys)
+            ]
+            if not unmatched_supports.empty:
+                details = []
+                for _, support in unmatched_supports.head(10).iterrows():
+                    invoice_id = self._clean_text(support.get("invoice_id")) or "SIN_NUMERO"
+                    source_file = self._clean_text(support.get("source_file")) or "archivo adjunto"
+                    details.append(f"{invoice_id} ({source_file})")
+                extra = "" if len(unmatched_supports) <= 10 else f" y {len(unmatched_supports) - 10} mas"
+                raise PipelineError(
+                    "Los XML/PDF adjuntos no coinciden con el archivo consolidado de facturas. "
+                    "Revisa que el numero de factura exista en el invoices file: "
+                    + ", ".join(details)
+                    + extra
+                    + "."
+                )
+
+            invoice_supports = self._apply_support_split_factors(invoice_supports)
             support_best = invoice_supports.sort_values(["invoice_key", "flags"], na_position="first").drop_duplicates("invoice_key")
             support_best = support_best.rename(
                 columns={
@@ -431,6 +487,7 @@ class LeaseAccountingPipeline:
                     "payment_terms_text": "support_payment_terms_text",
                     "item_count_hint": "support_item_count_hint",
                     "line_items": "support_line_items",
+                    "split_factor": "support_split_factor",
                     "flags": "support_flags",
                 }
             )
@@ -447,6 +504,7 @@ class LeaseAccountingPipeline:
                         "support_payment_terms_text",
                         "support_item_count_hint",
                         "support_line_items",
+                        "support_split_factor",
                         "support_flags",
                     ]
                 ],
@@ -466,8 +524,11 @@ class LeaseAccountingPipeline:
                 invoices["support_line_items"],
             )
             invoices["amount"] = invoices["support_subtotal"].combine_first(invoices["total"].fillna(0) - invoices["vat"].fillna(0)).round(2)
+            invoices = self._expand_split_invoice_rows(invoices)
         else:
             invoices["support_flags"] = None
+            invoices["support_split_factor"] = 1
+            invoices["support_split_index"] = 1
 
         control = cleaned["control"]
         control["vendor_key"] = control["vendor_code"].fillna(control["vendor"]).map(self._text_key)
@@ -738,6 +799,8 @@ class LeaseAccountingPipeline:
                 "payment_terms_text",
                 "item_count_hint",
                 "invoice_line_items",
+                "support_split_factor",
+                "support_split_index",
                 "contract_status_blocked",
             ]
         ].copy()
@@ -793,13 +856,15 @@ class LeaseAccountingPipeline:
             macro_database_df=macro_database_df,
             macro_template_path=macro_template_path,
         )
+        header_export_visible_df = header_export_df.drop(columns=["_posting_index"], errors="ignore")
+        lucy_export_visible_df = lucy_export_df.drop(columns=["_posting_index"], errors="ignore")
 
         with pd.ExcelWriter(self.output_dir / excel_name, engine="openpyxl") as writer:
             summary_df.to_excel(writer, sheet_name="summary", index=False)
-            header_export_df.to_excel(writer, sheet_name="lucy_header_export", index=False)
+            header_export_visible_df.to_excel(writer, sheet_name="lucy_header_export", index=False)
             headers_df.to_excel(writer, sheet_name="lucy_headers", index=False)
             lines_df.to_excel(writer, sheet_name="lucy_lines", index=False)
-            lucy_export_df.to_excel(writer, sheet_name="lucy_export", index=False)
+            lucy_export_visible_df.to_excel(writer, sheet_name="lucy_export", index=False)
             mapping_df.to_excel(writer, sheet_name="lucy_mapping", index=False)
             header_matrix_df.to_excel(writer, sheet_name="lucy_header_matrix", index=False)
         self._style_output_workbook(self.output_dir / excel_name)
@@ -807,17 +872,17 @@ class LeaseAccountingPipeline:
         try:
             with pd.ExcelWriter(self.output_dir / excel_fixed_name, engine="openpyxl") as writer:
                 summary_df.to_excel(writer, sheet_name="summary", index=False)
-                header_export_df.to_excel(writer, sheet_name="lucy_header_export", index=False)
+                header_export_visible_df.to_excel(writer, sheet_name="lucy_header_export", index=False)
                 headers_df.to_excel(writer, sheet_name="lucy_headers", index=False)
                 lines_df.to_excel(writer, sheet_name="lucy_lines", index=False)
-                lucy_export_df.to_excel(writer, sheet_name="lucy_export", index=False)
+                lucy_export_visible_df.to_excel(writer, sheet_name="lucy_export", index=False)
                 mapping_df.to_excel(writer, sheet_name="lucy_mapping", index=False)
                 header_matrix_df.to_excel(writer, sheet_name="lucy_header_matrix", index=False)
             self._style_output_workbook(self.output_dir / excel_fixed_name)
         except PermissionError:
             self._log(f"Could not overwrite {excel_fixed_name} because the file is open.")
-        lucy_export_df.to_csv(self.output_dir / csv_name, index=False, encoding="utf-8-sig")
-        header_export_df.to_csv(self.output_dir / header_csv_name, index=False, encoding="utf-8-sig")
+        lucy_export_visible_df.to_csv(self.output_dir / csv_name, index=False, encoding="utf-8-sig")
+        header_export_visible_df.to_csv(self.output_dir / header_csv_name, index=False, encoding="utf-8-sig")
         self._write_invoice_csv_bundle(
             summary_df=summary_df,
             header_export_df=header_export_df,
@@ -877,19 +942,77 @@ class LeaseAccountingPipeline:
             logs=self.logs.copy(),
         )
 
-    def _load_invoice_supports(self, support_paths: list[Path]) -> pd.DataFrame:
+    def _load_invoice_supports(
+        self,
+        support_paths: list[Path],
+        support_split_factors: dict[str, int] | None = None,
+    ) -> pd.DataFrame:
         if not support_paths:
             return pd.DataFrame()
         self._log(f"Parsing {len(support_paths)} invoice support files (PDF/XML).")
         df = InvoiceSupportReader().parse_many(support_paths)
+        split_factor_by_name = {
+            Path(path).name: max(int(factor or 1), 1)
+            for path, factor in (support_split_factors or {}).items()
+        }
+        df["split_factor"] = df["source_file"].map(split_factor_by_name).fillna(1).astype(int)
         for _, row in df.iterrows():
+            split_note = f", Split: {row['split_factor']} tiendas" if int(row.get("split_factor") or 1) > 1 else ""
             self._log(
                 f"  Support File parsed: {row['source_file']} ({row['source_type'].upper()}) -> "
                 f"Invoice_ID: {row['invoice_id']}, Date: {row['invoice_date']}, "
                 f"Subtotal: {row['subtotal']}, Total: {row['total']}, VAT: {row['detected_iva']}, "
-                f"Withholding: {row['withholding_tax']}, Flags: {row['flags']}"
+                f"Withholding: {row['withholding_tax']}{split_note}, Flags: {row['flags']}"
             )
         return df
+
+    def _apply_support_split_factors(self, supports: pd.DataFrame) -> pd.DataFrame:
+        df = supports.copy()
+        if "split_factor" not in df.columns:
+            df["split_factor"] = 1
+        df["split_factor"] = pd.to_numeric(df["split_factor"], errors="coerce").fillna(1).clip(lower=1)
+        split_mask = df["split_factor"] > 1
+        if not split_mask.any():
+            return df
+
+        for col in ["subtotal", "total", "detected_iva", "withholding_tax"]:
+            if col in df.columns:
+                values = pd.to_numeric(df.loc[split_mask, col], errors="coerce")
+                df.loc[split_mask, col] = (values / df.loc[split_mask, "split_factor"]).round(2)
+
+        if "line_items" in df.columns:
+            df.loc[split_mask, "line_items"] = df.loc[split_mask].apply(
+                lambda row: self._scale_invoice_line_items(row.get("line_items"), row.get("split_factor")),
+                axis=1,
+            )
+        return df
+
+    def _scale_invoice_line_items(self, line_items, split_factor) -> list[dict]:
+        factor = pd.to_numeric(pd.Series([split_factor]), errors="coerce").iloc[0]
+        if pd.isna(factor) or float(factor) <= 1:
+            return self._invoice_line_items(line_items)
+        scaled_items = []
+        for item in self._invoice_line_items(line_items):
+            scaled = dict(item)
+            for key in ["amount", "tax_amount"]:
+                value = pd.to_numeric(pd.Series([scaled.get(key)]), errors="coerce").iloc[0]
+                if pd.notna(value):
+                    scaled[key] = round(float(value) / float(factor), 2)
+            scaled_items.append(scaled)
+        return scaled_items
+
+    def _expand_split_invoice_rows(self, invoices: pd.DataFrame) -> pd.DataFrame:
+        if "support_split_factor" not in invoices.columns:
+            invoices["support_split_factor"] = 1
+        invoices["support_split_factor"] = pd.to_numeric(invoices["support_split_factor"], errors="coerce").fillna(1).clip(lower=1)
+        expanded_rows = []
+        for _, row in invoices.iterrows():
+            split_factor = int(row.get("support_split_factor") or 1)
+            for split_index in range(1, split_factor + 1):
+                new_row = row.copy()
+                new_row["support_split_index"] = split_index
+                expanded_rows.append(new_row)
+        return pd.DataFrame(expanded_rows).reset_index(drop=True)
 
     def _load_invoices(self, path: Path) -> pd.DataFrame:
         if path.suffix.lower() == ".xml":
@@ -1035,6 +1158,35 @@ class LeaseAccountingPipeline:
         if "vq_percent" not in result.columns:
             result["vq_percent"] = None
         return result
+
+    def _load_learning_dictionary(self, path: Path | None = None) -> pd.DataFrame:
+        target = Path(path) if path else self.learning_dictionary_path
+        columns = ["concept", "account", "phrases", "text"]
+        if not target.exists():
+            return pd.DataFrame(columns=columns)
+        df = pd.read_excel(target, sheet_name="Diccionario", dtype=str).fillna("")
+        df = df.rename(
+            columns=self._best_effort_rename(
+                df.columns,
+                {
+                    "concept": ["concepto"],
+                    "account": ["gl_account", "gl account", "cuenta", "cuenta_contable"],
+                    "phrases": ["frases_palabras", "frases/palabras", "frase_palabra", "palabras", "frases"],
+                    "text": ["texto_corto_lucy", "texto corto lucy", "texto", "text"],
+                },
+            )
+        )
+        if "concept" not in df.columns or "phrases" not in df.columns:
+            return pd.DataFrame(columns=columns)
+        if "account" not in df.columns:
+            df["account"] = ""
+        if "text" not in df.columns:
+            df["text"] = df["concept"]
+        df["concept"] = df["concept"].map(self._clean_text)
+        df["account"] = df["account"].map(self._clean_text)
+        df["phrases"] = df["phrases"].map(self._clean_text)
+        df["text"] = df["text"].map(self._clean_text)
+        return df[[col for col in columns if col in df.columns]].dropna(how="all")
 
     def _load_distribution(self, path: Path) -> pd.DataFrame:
         df = pd.read_excel(path, sheet_name="Distrubución", header=1)
@@ -1256,6 +1408,7 @@ class LeaseAccountingPipeline:
         for _, row in lines_df.iterrows():
             export_rows.append(
                 {
+                    "_posting_index": row.get("posting_index"),
                     "D/A$S/H": row.get("posting_key"),
                     "Imp$Amount": row.get("amount"),
                     "Cod_Iva$Vat Code": row.get("tax_code"),
@@ -1288,7 +1441,7 @@ class LeaseAccountingPipeline:
             if column not in export_df.columns:
                 export_df[column] = None
 
-        export_df = export_df[template_columns].copy()
+        export_df = export_df[["_posting_index"] + template_columns].copy()
         return export_df
 
     def _build_header_export(self, summary_df: pd.DataFrame) -> pd.DataFrame:
@@ -1309,6 +1462,7 @@ class LeaseAccountingPipeline:
                 vat_code = "V0" if float(vat_total) == 0 else "I1"
 
             data = {
+                "_posting_index": row.get("posting_index"),
                 "checkSkipSubjectChannel": False,
                 "Legal entity": "8140 - GMO Colombia",
                 "Original Invoice Number": row.get("invoice_id"),
@@ -1344,7 +1498,7 @@ class LeaseAccountingPipeline:
         if header_df.empty:
             header_df = pd.DataFrame(columns=self.HEADER_EXPORT_COLUMNS)
 
-        return header_df.reindex(columns=self.HEADER_EXPORT_COLUMNS)
+        return header_df.reindex(columns=["_posting_index"] + self.HEADER_EXPORT_COLUMNS)
 
     def _build_header_matrix(self) -> pd.DataFrame:
         rows = [
@@ -1518,16 +1672,14 @@ class LeaseAccountingPipeline:
         bundle_dir = self.output_dir / f"invoice_csvs_{timestamp}"
         bundle_dir.mkdir(parents=True, exist_ok=True)
 
-        invoice_ids = [invoice_id for invoice_id in summary_df["invoice_id"].dropna().astype(str).unique().tolist() if invoice_id]
-        for invoice_id in invoice_ids:
-            safe_invoice_id = self._safe_filename(invoice_id)
+        for _, summary_row in summary_df.dropna(subset=["invoice_id"]).iterrows():
+            invoice_id = str(summary_row["invoice_id"])
+            safe_invoice_id = self._posting_file_stem(summary_row)
             invoice_dir = bundle_dir / safe_invoice_id
             invoice_dir.mkdir(parents=True, exist_ok=True)
 
-            header_slice = header_export_df[header_export_df["Invoice Number"].astype(str) == str(invoice_id)].copy()
-            allocated_slice = lucy_export_df[
-                lucy_export_df["Attribuzione$Assignment"].astype(str) == str(invoice_id)
-            ].copy()
+            header_slice = self._header_slice_for_posting(header_export_df, summary_row)
+            allocated_slice = self._lucy_slice_for_posting(lucy_export_df, summary_row)
 
             if header_slice.empty:
                 header_slice = pd.DataFrame(columns=self.HEADER_EXPORT_COLUMNS)
@@ -1556,14 +1708,13 @@ class LeaseAccountingPipeline:
         bundle_dir = self.output_dir / f"invoice_manual_style_csvs_{timestamp}"
         bundle_dir.mkdir(parents=True, exist_ok=True)
 
-        invoice_ids = [invoice_id for invoice_id in summary_df["invoice_id"].dropna().astype(str).unique().tolist() if invoice_id]
-        for invoice_id in invoice_ids:
-            safe_invoice_id = self._safe_filename(invoice_id)
+        for _, summary_row in summary_df.dropna(subset=["invoice_id"]).iterrows():
+            safe_invoice_id = self._posting_file_stem(summary_row)
             file_path = bundle_dir / f"{safe_invoice_id}_manual_style.csv"
 
-            header_slice = header_export_df[header_export_df["Invoice Number"].astype(str) == str(invoice_id)].copy()
-            allocated_slice = lucy_export_df[lucy_export_df["Attribuzione$Assignment"].astype(str) == str(invoice_id)].copy()
-            summary_slice = summary_df[summary_df["invoice_id"].astype(str) == str(invoice_id)].copy()
+            header_slice = self._header_slice_for_posting(header_export_df, summary_row)
+            allocated_slice = self._lucy_slice_for_posting(lucy_export_df, summary_row)
+            summary_slice = pd.DataFrame([summary_row])
 
             self._write_manual_style_csv(
                 path=file_path,
@@ -1577,6 +1728,49 @@ class LeaseAccountingPipeline:
             for file_path in bundle_dir.rglob("*"):
                 if file_path.is_file():
                     zip_file.write(file_path, arcname=file_path.relative_to(bundle_dir.parent))
+
+    def _posting_file_stem(self, summary_row) -> str:
+        invoice_id = self._safe_filename(str(summary_row.get("invoice_id") or "SIN_FACTURA"))
+        posting_count = pd.to_numeric(pd.Series([summary_row.get("posting_count")]), errors="coerce").iloc[0]
+        posting_index = pd.to_numeric(pd.Series([summary_row.get("posting_index")]), errors="coerce").iloc[0]
+        if pd.notna(posting_count) and int(posting_count) > 1 and pd.notna(posting_index):
+            return f"{invoice_id}_{int(posting_index)}"
+        return invoice_id
+
+    def _header_slice_for_posting(self, header_export_df: pd.DataFrame, summary_row) -> pd.DataFrame:
+        invoice_id = str(summary_row.get("invoice_id") or "")
+        result = header_export_df[header_export_df["Invoice Number"].astype(str) == invoice_id].copy()
+        posting_index = pd.to_numeric(pd.Series([summary_row.get("posting_index")]), errors="coerce").iloc[0]
+        if "_posting_index" in result.columns and pd.notna(posting_index):
+            narrowed = result[pd.to_numeric(result["_posting_index"], errors="coerce") == int(posting_index)]
+            if not narrowed.empty:
+                result = narrowed.copy()
+        ceco = self._clean_text(summary_row.get("ceco"))
+        if ceco and "SAP_KOSTL" in result.columns:
+            narrowed = result[result["SAP_KOSTL"].astype(str).map(self._clean_text) == ceco]
+            if not narrowed.empty:
+                result = narrowed.copy()
+        return result.drop(columns=["_posting_index"], errors="ignore")
+
+    def _lucy_slice_for_posting(self, lucy_export_df: pd.DataFrame, summary_row) -> pd.DataFrame:
+        invoice_id = str(summary_row.get("invoice_id") or "")
+        result = lucy_export_df[lucy_export_df["Attribuzione$Assignment"].astype(str) == invoice_id].copy()
+        posting_index = pd.to_numeric(pd.Series([summary_row.get("posting_index")]), errors="coerce").iloc[0]
+        if "_posting_index" in result.columns and pd.notna(posting_index):
+            narrowed = result[pd.to_numeric(result["_posting_index"], errors="coerce") == int(posting_index)]
+            if not narrowed.empty:
+                result = narrowed.copy()
+        ceco = self._clean_text(summary_row.get("ceco"))
+        profit_center = self._clean_text(summary_row.get("profit_center"))
+        if ceco and "CdC$Cost Center" in result.columns:
+            narrowed = result[result["CdC$Cost Center"].astype(str).map(self._clean_text) == ceco]
+            if not narrowed.empty:
+                result = narrowed.copy()
+        if profit_center and "ProfitCenter$Profit Center" in result.columns:
+            narrowed = result[result["ProfitCenter$Profit Center"].astype(str).map(self._clean_text) == profit_center]
+            if not narrowed.empty:
+                result = narrowed.copy()
+        return result.drop(columns=["_posting_index"], errors="ignore")
 
     def _write_manual_style_csv(
         self,
@@ -1807,6 +2001,10 @@ class LeaseAccountingPipeline:
         summary_df["posting_key"] = summary_df["invoice_id"].fillna("") + "|" + summary_df["vendor"].fillna("")
         summary_df["posting_index"] = summary_df.groupby("invoice_id").cumcount() + 1
         summary_df["posting_count"] = summary_df.groupby("invoice_id")["invoice_id"].transform("size")
+        if "support_split_index" not in summary_df.columns:
+            summary_df["support_split_index"] = summary_df["posting_index"]
+        if "support_split_factor" not in summary_df.columns:
+            summary_df["support_split_factor"] = summary_df["posting_count"]
         summary_df["document_type"] = "Supplier Invoice"
         summary_df["movement_type"] = "5-FI"
         summary_df["currency"] = "COP"
@@ -1832,6 +2030,8 @@ class LeaseAccountingPipeline:
                 "vendor",
                 "posting_index",
                 "posting_count",
+                "support_split_index",
+                "support_split_factor",
                 "invoice_date",
                 "document_type",
                 "movement_type",
@@ -1860,6 +2060,8 @@ class LeaseAccountingPipeline:
                 "vendor": row["vendor"],
                 "posting_index": row["posting_index"],
                 "posting_count": row["posting_count"],
+                "support_split_index": row.get("support_split_index"),
+                "support_split_factor": row.get("support_split_factor"),
                 "invoice_date": row["invoice_date"],
                 "store": row["store"],
                 "ceco": row["ceco"],
@@ -1941,6 +2143,8 @@ class LeaseAccountingPipeline:
                     "vendor",
                     "posting_index",
                     "posting_count",
+                    "support_split_index",
+                    "support_split_factor",
                     "invoice_date",
                     "store",
                     "ceco",
@@ -1980,6 +2184,8 @@ class LeaseAccountingPipeline:
                 "invoice_line_items",
                 "posting_index",
                 "posting_count",
+                "support_split_index",
+                "support_split_factor",
                 "invoice_total",
                 "vat_status",
             ]
@@ -2351,6 +2557,10 @@ class LeaseAccountingPipeline:
     def _item_line_classification(self, item: dict, row) -> tuple[str, str]:
         description = self._clean_text(item.get("description"))
         description_key = self._concept_key(description)
+        dictionary_match = self._match_learning_dictionary(description, row)
+        if dictionary_match:
+            return dictionary_match
+
         for concept, account, patterns in self.ITEM_CONCEPT_RULES:
             if any(re.search(pattern, description_key) for pattern in patterns):
                 return concept, account
@@ -2363,6 +2573,92 @@ class LeaseAccountingPipeline:
         concept = self._item_line_concept(item, row)
         account = self._clean_numeric_code(row.get("account")) or self.VARIABLE_ACCOUNT
         return concept, account
+
+    def _match_learning_dictionary(self, description: str | None, row) -> tuple[str, str] | None:
+        description_key = self._concept_key(description)
+        if not description_key or self.learning_dictionary.empty:
+            return None
+
+        candidates = []
+        for _, rule in self.learning_dictionary.iterrows():
+            concept = self._clean_text(rule.get("concept"))
+            account = self._clean_text(rule.get("account"))
+            phrases = self._split_dictionary_phrases(rule.get("phrases"))
+            if not concept or not phrases:
+                continue
+            for phrase in phrases:
+                phrase_key = self._concept_key(phrase)
+                if phrase_key and phrase_key in description_key:
+                    candidates.append((len(phrase_key), concept, account, phrase_key))
+
+        if not candidates:
+            return None
+
+        _, concept, account, _ = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+        if account == "SEGUN CONTRATO" or account == "SEGUN_CONTRATO" or concept == "RENTA":
+            account = self._clean_numeric_code(row.get("account")) or self.VARIABLE_ACCOUNT
+            concept = self._resolve_account_concept(account, row.get("rent_type"))
+        elif not account:
+            return None
+        else:
+            account = self._clean_numeric_code(account) or account
+        return concept, account
+
+    def _split_dictionary_phrases(self, value) -> list[str]:
+        text = self._clean_text(value)
+        if not text:
+            return []
+        return [part.strip() for part in str(text).split(",") if part.strip()]
+
+    def build_concept_review_items(self, output_df: pd.DataFrame) -> list[dict]:
+        review_items: dict[str, dict] = {}
+        for _, row in output_df.iterrows():
+            for item in self._invoice_line_items(row.get("invoice_line_items")):
+                description = self._clean_text(item.get("description"))
+                amount = pd.to_numeric(pd.Series([item.get("amount")]), errors="coerce").iloc[0]
+                if not description or pd.isna(amount) or abs(float(amount)) == 0:
+                    continue
+                if any(re.search(pattern, self._concept_key(description)) for pattern in self.RENT_ITEM_PATTERNS):
+                    continue
+                if self._match_learning_dictionary(description, row):
+                    continue
+
+                key = self._concept_key(description)
+                if key not in review_items:
+                    review_items[key] = {
+                        "key": key,
+                        "description": description,
+                        "suggested_phrase": description,
+                        "count": 0,
+                        "total_amount": 0.0,
+                        "examples": [],
+                    }
+                review_items[key]["count"] += 1
+                review_items[key]["total_amount"] += float(amount)
+                if len(review_items[key]["examples"]) < 3:
+                    review_items[key]["examples"].append(
+                        {
+                            "invoice_id": row.get("invoice_id"),
+                            "store": row.get("store"),
+                            "ceco": row.get("ceco"),
+                            "amount": round(float(amount), 2),
+                        }
+                    )
+        return sorted(review_items.values(), key=lambda item: item["description"])
+
+    def learning_concepts(self) -> list[dict]:
+        if self.learning_dictionary.empty:
+            return []
+        concepts = []
+        seen = set()
+        for _, row in self.learning_dictionary.iterrows():
+            concept = self._clean_text(row.get("concept"))
+            account = self._clean_text(row.get("account"))
+            if not concept or concept in seen:
+                continue
+            seen.add(concept)
+            concepts.append({"concept": concept, "account": account})
+        return concepts
 
     def _compact_item_concept(self, description: str) -> str:
         concept = self._concept_key(description)
