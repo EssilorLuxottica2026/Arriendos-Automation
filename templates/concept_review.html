@@ -66,7 +66,11 @@
                                         </select>
                                     </td>
                                     <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 280px;">
-                                        <input type="text" name="phrase_{{ idx }}" class="text-input-field" value="{{ item.suggested_phrase }}" required>
+                                        <div class="tag-input" data-initial="{{ item.suggested_phrase }}">
+                                            <div class="tag-list" aria-live="polite"></div>
+                                            <input type="text" class="tag-entry" placeholder="Escribe una frase y presiona Enter">
+                                            <input type="hidden" name="phrase_{{ idx }}" class="tag-hidden" required>
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -87,7 +91,87 @@
         </form>
     </main>
     <script>
+        function normalizeTag(value) {
+            return value.replace(/\s+/g, ' ').trim();
+        }
+
+        function renderTags(container, tags) {
+            const list = container.querySelector('.tag-list');
+            const hidden = container.querySelector('.tag-hidden');
+            list.innerHTML = '';
+            tags.forEach((tag, index) => {
+                const chip = document.createElement('span');
+                chip.className = 'phrase-tag';
+                chip.textContent = tag;
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'phrase-tag-remove';
+                remove.setAttribute('aria-label', `Quitar ${tag}`);
+                remove.textContent = 'x';
+                remove.addEventListener('click', () => {
+                    tags.splice(index, 1);
+                    renderTags(container, tags);
+                });
+
+                chip.appendChild(remove);
+                list.appendChild(chip);
+            });
+            hidden.value = tags.join(', ');
+        }
+
+        document.querySelectorAll('.tag-input').forEach((container) => {
+            const entry = container.querySelector('.tag-entry');
+            const tags = [];
+            const initial = normalizeTag(container.dataset.initial || '');
+            if (initial) {
+                tags.push(initial);
+            }
+            renderTags(container, tags);
+
+            function addCurrentTag() {
+                const value = normalizeTag(entry.value);
+                if (!value) {
+                    return;
+                }
+                const exists = tags.some((tag) => tag.toUpperCase() === value.toUpperCase());
+                if (!exists) {
+                    tags.push(value);
+                }
+                entry.value = '';
+                renderTags(container, tags);
+            }
+
+            entry.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ',') {
+                    event.preventDefault();
+                    addCurrentTag();
+                }
+                if (event.key === 'Backspace' && !entry.value && tags.length) {
+                    tags.pop();
+                    renderTags(container, tags);
+                }
+            });
+
+            entry.addEventListener('blur', addCurrentTag);
+        });
+
         document.querySelector('form').addEventListener('submit', function() {
+            document.querySelectorAll('.tag-input').forEach((container) => {
+                const entry = container.querySelector('.tag-entry');
+                const value = normalizeTag(entry.value);
+                if (value) {
+                    const tags = container.querySelector('.tag-hidden').value
+                        .split(',')
+                        .map((tag) => normalizeTag(tag))
+                        .filter(Boolean);
+                    if (!tags.some((tag) => tag.toUpperCase() === value.toUpperCase())) {
+                        tags.push(value);
+                    }
+                    container.querySelector('.tag-hidden').value = tags.join(', ');
+                    entry.value = '';
+                }
+            });
             const btn = document.getElementById('submitBtn');
             btn.classList.add('loading');
             btn.querySelector('span').textContent = 'Guardando y procesando...';
