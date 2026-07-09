@@ -7,7 +7,20 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <div class="splash-screen" aria-hidden="true">
+        <div class="splash-card">
+            <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="" class="splash-logo">
+            <div class="splash-loader"></div>
+        </div>
+    </div>
     <main class="page">
+        <nav class="brand-bar">
+            <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+        </nav>
         <!-- CABECERA DE ÉXITO -->
         <section class="panel success-header">
             <div class="success-icon-wrapper">
