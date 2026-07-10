@@ -481,6 +481,16 @@ class LeaseAccountingPipeline:
         invoices["ceco_key"] = invoices["ceco"].map(self._ceco_key)
         invoices["invoice_vendor_key"] = invoices["invoice_id"].map(self._clean_text).fillna("") + "|" + invoices["vendor_key"].fillna("")
         invoices["invoice_pdf_key"] = invoices["invoice_id"].map(self._invoice_key)
+        if "invoice_input_type" not in invoices.columns:
+            invoices["invoice_input_type"] = "table"
+        else:
+            invoices["invoice_input_type"] = invoices["invoice_input_type"].fillna("table")
+        table_input = invoices["invoice_input_type"].eq("table").any()
+
+        blank_invoice_rows = int(invoices["invoice_pdf_key"].isna().sum())
+        if blank_invoice_rows:
+            invoices = invoices[invoices["invoice_pdf_key"].notna()].copy()
+            self._log(f"Ignored {blank_invoice_rows} blank rows from the invoices file.")
 
         invoice_supports = cleaned["invoice_supports"]
         if not invoice_supports.empty:
@@ -504,6 +514,40 @@ class LeaseAccountingPipeline:
                     + extra
                     + "."
                 )
+
+            if table_input:
+                xml_supports = invoice_supports[
+                    invoice_supports.get("source_type", pd.Series(index=invoice_supports.index, dtype=object))
+                    .fillna("")
+                    .str.lower()
+                    .eq("xml")
+                ].copy()
+                if xml_supports.empty:
+                    raise PipelineError(
+                        "El invoices file no tiene facturas XML coincidentes. "
+                        "Adjunta al menos un XML para generar archivos CSV."
+                    )
+
+                matched_xml_keys = set(xml_supports["invoice_key"].dropna())
+                omitted = invoices[~invoices["invoice_pdf_key"].isin(matched_xml_keys)].copy()
+                omitted_ids = list(dict.fromkeys(omitted["invoice_id"].dropna().map(str).tolist()))
+                if omitted_ids:
+                    preview = ", ".join(omitted_ids[:10])
+                    extra = "" if len(omitted_ids) <= 10 else f" y {len(omitted_ids) - 10} más"
+                    self._record_warning(
+                        f"Se omitieron {len(omitted_ids)} facturas del invoices file porque no tienen XML coincidente: "
+                        f"{preview}{extra}. No se generaron CSV para esas facturas."
+                    )
+
+                invoices = invoices[invoices["invoice_pdf_key"].isin(matched_xml_keys)].copy()
+                duplicate_subset = ["invoice_pdf_key", "vendor_key", "store_key", "ceco_key"]
+                duplicate_count = int(invoices.duplicated(subset=duplicate_subset, keep="first").sum())
+                if duplicate_count:
+                    invoices = invoices.drop_duplicates(subset=duplicate_subset, keep="first").copy()
+                    self._record_warning(
+                        f"Se omitieron {duplicate_count} filas duplicadas del invoices file para evitar generar CSV repetidos."
+                    )
+                invoice_supports = xml_supports
 
             self._warn_support_store_mismatches(invoices, invoice_supports)
             invoice_supports = self._apply_support_split_factors(invoice_supports)
@@ -558,6 +602,11 @@ class LeaseAccountingPipeline:
             invoices["amount"] = invoices["support_subtotal"].combine_first(invoices["total"].fillna(0) - invoices["vat"].fillna(0)).round(2)
             invoices = self._expand_split_invoice_rows(invoices)
         else:
+            if table_input:
+                raise PipelineError(
+                    "El invoices file requiere al menos una factura XML coincidente. "
+                    "Las filas sin XML no generan archivos CSV."
+                )
             invoices["support_flags"] = None
             invoices["support_split_factor"] = 1
             invoices["support_split_index"] = 1
@@ -1049,7 +1098,9 @@ class LeaseAccountingPipeline:
 
     def _load_invoices(self, path: Path) -> pd.DataFrame:
         if path.suffix.lower() == ".xml":
-            return self._load_invoices_from_xml(path)
+            df = self._load_invoices_from_xml(path)
+            df["invoice_input_type"] = "xml"
+            return df
 
         df = self._safe_read_table(path)
         original_columns = [self._clean_text(col) or str(col) for col in df.columns]
@@ -1094,6 +1145,7 @@ class LeaseAccountingPipeline:
                 f"Expected at least {sorted(required)} and could not find {sorted(missing)}. "
                 f"Detected columns: {original_columns}."
             )
+        df["invoice_input_type"] = "table"
         return df
 
     def _load_invoices_from_xml(self, path: Path) -> pd.DataFrame:
@@ -2844,9 +2896,12 @@ class LeaseAccountingPipeline:
                 f"{invoice_id} pertenece a la tienda {expected_label} en el invoices file. "
                 "Revisa si el XML fue nombrado o enviado incorrectamente; el proceso continuó sin modificarlo."
             )
-            if warning not in self.warnings:
-                self.warnings.append(warning)
-                self._log(f"WARNING: {warning}")
+            self._record_warning(warning)
+
+    def _record_warning(self, warning: str) -> None:
+        if warning not in self.warnings:
+            self.warnings.append(warning)
+            self._log(f"WARNING: {warning}")
 
     def _log(self, message: str) -> None:
         LOGGER.info(message)
