@@ -7,7 +7,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <div class="splash-screen" aria-hidden="true">
+        <div class="splash-card">
+            <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="" class="splash-logo">
+            <div class="splash-loader"></div>
+        </div>
+    </div>
     <main class="page">
+        <nav class="brand-bar">
+            <a class="brand-home" href="{{ url_for('index') }}" aria-label="Ir a la página principal">
+                <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            </a>
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+            <a class="nav-action" href="{{ url_for('settings') }}" title="Configuración de conceptos">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.14.37.36.7.66.96.3.26.68.4 1.08.4H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+                <span>Configuración</span>
+            </a>
+        </nav>
         <section class="panel">
             <h1>Revisión de conceptos</h1>
             <p class="lede">
@@ -35,7 +54,7 @@
                         <thead>
                             <tr>
                                 <th style="text-align:left; padding: 10px;">Descripción</th>
-                                <th style="text-align:left; padding: 10px;">Ejemplos</th>
+                                <th style="text-align:left; padding: 10px;">Origen del item</th>
                                 <th style="text-align:left; padding: 10px;">Concepto</th>
                                 <th style="text-align:left; padding: 10px;">Frase/palabra a guardar</th>
                             </tr>
@@ -52,8 +71,11 @@
                                     </td>
                                     <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 220px;">
                                         {% for example in item.examples %}
-                                            <div style="font-size: .85rem; margin-bottom: 6px;">
-                                                Factura {{ example.invoice_id }} · {{ example.store }} · CECO {{ example.ceco }} · {{ example.amount }}
+                                            <div class="item-origin">
+                                                <div><span>Factura:</span> {{ example.invoice_id }}</div>
+                                                <div><span>Tienda:</span> {{ example.store }}</div>
+                                                <div><span>CECO:</span> {{ example.ceco }}</div>
+                                                <div><span>Importe:</span> {{ example.amount }}</div>
                                             </div>
                                         {% endfor %}
                                     </td>
@@ -80,7 +102,7 @@
 
                 <div class="form-helpers">
                     <div class="helper-card">
-                        La frase guardada se agrega a <code>Diccionario_Conceptos_Simple.xlsx</code>. En la siguiente corrida, la app intentará clasificar automáticamente usando primero las frases más específicas.
+                        La app elimina automáticamente el mes y el año de la frase antes de guardarla en <code>Diccionario_Conceptos_Simple.xlsx</code>. En la siguiente corrida intentará clasificar usando primero las frases más específicas.
                     </div>
                 </div>
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 import json
+import re
 import shutil
 from datetime import datetime
 
@@ -16,7 +17,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 
-from .pipeline.processor import LeaseAccountingPipeline, PipelineError
+from .pipeline.processor import LeaseAccountingPipeline, PipelineError, normalize_learning_phrase
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -179,7 +180,8 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
         existing = [part.strip() for part in current.split(",") if part.strip()]
         existing_keys = {part.upper() for part in existing}
         for phrase in [part.strip() for part in phrase_text.split(",") if part.strip()]:
-            if phrase.upper() not in existing_keys:
+            phrase = normalize_learning_phrase(phrase)
+            if phrase and phrase.upper() not in existing_keys:
                 existing.append(phrase)
                 existing_keys.add(phrase.upper())
         sheet.cell(row_idx, phrases_col).value = ", ".join(existing)
@@ -193,6 +195,113 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
+
+
+def _dictionary_sheet(workbook):
+    if "Diccionario" not in workbook.sheetnames:
+        raise PipelineError("El diccionario debe tener una hoja llamada 'Diccionario'.")
+    sheet = workbook["Diccionario"]
+    headers = {str(cell.value or "").strip().lower(): idx for idx, cell in enumerate(sheet[1], start=1)}
+    concept_col = headers.get("concepto")
+    account_col = headers.get("gl account") or headers.get("gl_account") or headers.get("cuenta")
+    phrases_col = headers.get("frases/palabras") or headers.get("frases") or headers.get("palabras")
+    if not concept_col or not account_col or not phrases_col:
+        raise PipelineError("El diccionario debe tener columnas 'Concepto', 'GL Account' y 'Frases/palabras'.")
+    return sheet, concept_col, account_col, phrases_col
+
+
+def _load_dictionary_workbook():
+    if not LEARNING_DICTIONARY_PATH.exists():
+        raise PipelineError(f"No existe el diccionario de conceptos: {LEARNING_DICTIONARY_PATH.name}")
+    try:
+        return load_workbook(LEARNING_DICTIONARY_PATH)
+    except PermissionError as exc:
+        raise PipelineError("Cierra Diccionario_Conceptos_Simple.xlsx para modificar la configuracion.") from exc
+
+
+def _validate_concept_account(concept: str, account: str) -> tuple[str, str]:
+    concept = re.sub(r"\s+", " ", concept).strip().upper()
+    account = re.sub(r"\s+", "_", account).strip().upper()
+    if not concept or not account:
+        raise PipelineError("El concepto y el GL Account son obligatorios.")
+    if account != "SEGUN_CONTRATO" and not re.fullmatch(r"\d{6,15}", account):
+        raise PipelineError("El GL Account debe contener entre 6 y 15 digitos, o usar SEGUN_CONTRATO para RENTA.")
+    return concept, account
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    try:
+        workbook = _load_dictionary_workbook()
+        sheet, concept_col, account_col, phrases_col = _dictionary_sheet(workbook)
+
+        if request.method == "POST":
+            action = request.form.get("action", "").strip().lower()
+            rows_by_concept = {
+                str(sheet.cell(row_idx, concept_col).value or "").strip().upper(): row_idx
+                for row_idx in range(2, sheet.max_row + 1)
+                if str(sheet.cell(row_idx, concept_col).value or "").strip()
+            }
+
+            if action == "delete":
+                original = request.form.get("original_concept", "").strip().upper()
+                row_idx = rows_by_concept.get(original)
+                if not row_idx:
+                    raise PipelineError("El concepto que intentas eliminar ya no existe.")
+                sheet.delete_rows(row_idx, 1)
+                success_message = f"Concepto {original} eliminado correctamente."
+            else:
+                concept, account = _validate_concept_account(
+                    request.form.get("concept", ""),
+                    request.form.get("account", ""),
+                )
+
+            if action == "add":
+                if concept in rows_by_concept:
+                    raise PipelineError(f"El concepto {concept} ya existe. Puedes editarlo en la tabla.")
+                row_idx = sheet.max_row + 1
+                sheet.cell(row_idx, concept_col).value = concept
+                sheet.cell(row_idx, account_col).value = account
+                sheet.cell(row_idx, phrases_col).value = ""
+                success_message = f"Concepto {concept} agregado correctamente."
+            elif action == "update":
+                original = request.form.get("original_concept", "").strip().upper()
+                row_idx = rows_by_concept.get(original)
+                if not row_idx:
+                    raise PipelineError("El concepto que intentas editar ya no existe.")
+                duplicate_row = rows_by_concept.get(concept)
+                if duplicate_row and duplicate_row != row_idx:
+                    raise PipelineError(f"Ya existe otro concepto llamado {concept}.")
+                sheet.cell(row_idx, concept_col).value = concept
+                sheet.cell(row_idx, account_col).value = account
+                success_message = f"Concepto {concept} actualizado correctamente."
+            elif action != "delete":
+                raise PipelineError("Accion de configuracion no valida.")
+
+            try:
+                workbook.save(LEARNING_DICTIONARY_PATH)
+            except PermissionError as exc:
+                raise PipelineError("Cierra Diccionario_Conceptos_Simple.xlsx antes de guardar los cambios.") from exc
+            flash(success_message, "success")
+            return redirect(url_for("settings"))
+
+        concepts = []
+        for row_idx in range(2, sheet.max_row + 1):
+            concept = str(sheet.cell(row_idx, concept_col).value or "").strip()
+            if not concept:
+                continue
+            phrases = [part.strip() for part in str(sheet.cell(row_idx, phrases_col).value or "").split(",") if part.strip()]
+            concepts.append(
+                {
+                    "concept": concept,
+                    "account": str(sheet.cell(row_idx, account_col).value or "").strip(),
+                    "phrase_count": len(phrases),
+                }
+            )
+        return render_template("settings.html", concepts=concepts)
+    except PipelineError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("settings")) if request.method == "POST" else redirect(url_for("index"))
 
 
 @app.route("/process", methods=["POST"])

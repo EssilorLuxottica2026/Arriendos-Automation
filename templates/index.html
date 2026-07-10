@@ -7,7 +7,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <div class="splash-screen" aria-hidden="true">
+        <div class="splash-card">
+            <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="" class="splash-logo">
+            <div class="splash-loader"></div>
+        </div>
+    </div>
     <main class="page">
+        <nav class="brand-bar">
+            <a class="brand-home" href="{{ url_for('index') }}" aria-label="Ir a la página principal">
+                <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            </a>
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+            <a class="nav-action" href="{{ url_for('settings') }}" title="Configuración de conceptos">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.14.37.36.7.66.96.3.26.68.4 1.08.4H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+                <span>Configuración</span>
+            </a>
+        </nav>
         <header class="hero">
             <p class="eyebrow">Automatización de Arriendos</p>
             <h1>Pre-contabilización de Facturas Manuales</h1>
@@ -43,7 +62,7 @@
                     <div class="input-group" style="grid-column: span 2;">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span>Factura consolidada del mes o XML de factura</span>
+                            <span>Excel de arriendos (tabla que llega al correo)</span>
                             <span class="required-badge">*</span>
                         </div>
                         <div class="file-input-wrapper">
@@ -54,7 +73,7 @@
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                            <span>Facturas PDF / XML (Soportes múltiples - Opcional)</span>
+                            <span>Facturas XML (Soportes múltiples)</span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files" accept=".pdf,.xml" multiple>
@@ -64,7 +83,7 @@
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m8 5.87v-2a4 4 0 00-8 0v2m8-10a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                            <span>Soportes para dividir entre 2 tiendas</span>
+                            <span>XML para 2 tiendas</span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files_split_2" accept=".pdf,.xml" multiple>
@@ -74,7 +93,7 @@
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m8 5.87v-2a4 4 0 00-8 0v2m8-10a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                            <span>Soportes para dividir entre 3 tiendas</span>
+                            <span>XML para 3 tiendas</span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files_split_3" accept=".pdf,.xml" multiple>
@@ -84,7 +103,7 @@
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            <span>Período contable (MM-AAAA - Opcional)</span>
+                            <span>Período contable (MM-AAAA)</span>
                         </div>
                         <input type="text" name="period" class="text-input-field" placeholder="Ej: 05-2026">
                     </div>
