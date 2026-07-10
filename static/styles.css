@@ -391,6 +391,37 @@ button[type="submit"].loading::after {
     border: 1px solid var(--danger-border);
 }
 
+.warning-notifications {
+    display: grid;
+    gap: 10px;
+}
+
+.alert-warning {
+    align-items: flex-start;
+    color: #f5d58a;
+    background: rgba(194, 139, 47, 0.1);
+    border: 1px solid rgba(218, 164, 74, 0.3);
+}
+
+.alert-warning svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.alert-warning div {
+    display: grid;
+    gap: 4px;
+}
+
+.alert-warning strong {
+    color: #ffe1a3;
+}
+
+.alert-warning span {
+    color: #d8c49a;
+    line-height: 1.5;
+}
+
 /* SUCCESS PAGE */
 .success-header {
     text-align: center;
