@@ -17,6 +17,31 @@ from .pdf_reader import InvoiceSupportReader
 LOGGER = logging.getLogger(__name__)
 
 
+LEARNING_MONTH_PATTERN = (
+    r"ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|"
+    r"SEPTIEMBRE|SETIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE|"
+    r"ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SEPT|OCT|NOV|DIC"
+)
+
+
+def normalize_learning_phrase(value) -> str:
+    """Remove invoice-period tokens so learned phrases remain reusable."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not text:
+        return ""
+
+    text = re.sub(r"\b20\d{2}\s*[-/.]\s*(?:0?[1-9]|1[0-2])\s*[-/.]\s*(?:0?[1-9]|[12]\d|3[01])\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:0?[1-9]|[12]\d|3[01])\s*[-/.]\s*(?:0?[1-9]|1[0-2])\s*[-/.]\s*20\d{2}\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b20\d{2}\s*[-/.]\s*(?:0?[1-9]|1[0-2])\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:0?[1-9]|1[0-2])\s*[-/.]\s*(?:20)?\d{2}\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(rf"\b(?:{LEARNING_MONTH_PATTERN})\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b20\d{2}\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:MES|PER[IÍ]ODO|A[NÑ]O)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?:\s+\b(?:DE|DEL)\b)+\s*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*[-/.,;:]+\s*$", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 class PipelineError(Exception):
     """Controlled error for pipeline and upload issues."""
 
@@ -2575,7 +2600,7 @@ class LeaseAccountingPipeline:
         return concept, account
 
     def _match_learning_dictionary(self, description: str | None, row) -> tuple[str, str] | None:
-        description_key = self._concept_key(description)
+        description_key = self._concept_key(normalize_learning_phrase(description))
         if not description_key or self.learning_dictionary.empty:
             return None
 
@@ -2587,7 +2612,7 @@ class LeaseAccountingPipeline:
             if not concept or not phrases:
                 continue
             for phrase in phrases:
-                phrase_key = self._concept_key(phrase)
+                phrase_key = self._concept_key(normalize_learning_phrase(phrase))
                 if phrase_key and phrase_key in description_key:
                     candidates.append((len(phrase_key), concept, account, phrase_key))
 
@@ -2623,12 +2648,13 @@ class LeaseAccountingPipeline:
                 if self._match_learning_dictionary(description, row):
                     continue
 
-                key = self._concept_key(description)
+                suggested_phrase = normalize_learning_phrase(description) or description
+                key = self._concept_key(suggested_phrase)
                 if key not in review_items:
                     review_items[key] = {
                         "key": key,
                         "description": description,
-                        "suggested_phrase": description,
+                        "suggested_phrase": suggested_phrase,
                         "count": 0,
                         "total_amount": 0.0,
                         "examples": [],
