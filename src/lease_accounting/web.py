@@ -177,8 +177,14 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
             sheet.cell(row_idx, concept_col).value = concept
             concept_rows[concept.upper()] = row_idx
         current = str(sheet.cell(row_idx, phrases_col).value or "").strip()
-        existing = [part.strip() for part in current.split(",") if part.strip()]
-        existing_keys = {part.upper() for part in existing}
+        existing = []
+        existing_keys = set()
+        for part in current.split(","):
+            normalized = normalize_learning_phrase(part)
+            normalized_key = normalized.upper()
+            if normalized and normalized_key not in existing_keys:
+                existing.append(normalized)
+                existing_keys.add(normalized_key)
         for phrase in [part.strip() for part in phrase_text.split(",") if part.strip()]:
             phrase = normalize_learning_phrase(phrase)
             if phrase and phrase.upper() not in existing_keys:
@@ -369,7 +375,13 @@ def process():
         if review_items:
             _save_review_job(batch_id, job)
             concepts = pipeline.learning_concepts()
-            return render_template("concept_review.html", batch_id=batch_id, items=review_items, concepts=concepts)
+            return render_template(
+                "concept_review.html",
+                batch_id=batch_id,
+                items=review_items,
+                concepts=concepts,
+                warnings=pipeline.warnings,
+            )
 
         result = _run_pipeline_from_job(job)
     except PipelineError as exc:

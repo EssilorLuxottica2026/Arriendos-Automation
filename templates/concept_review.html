@@ -27,6 +27,16 @@
                 <span>Configuración</span>
             </a>
         </nav>
+        {% if warnings %}
+            <div class="alerts warning-notifications">
+                {% for warning in warnings %}
+                    <div class="alert alert-warning" role="status">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+                        <div><strong>Posible XML incorrecto</strong><span>{{ warning }}</span></div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
         <section class="panel">
             <h1>Revisión de conceptos</h1>
             <p class="lede">

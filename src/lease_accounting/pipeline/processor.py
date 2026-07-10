@@ -38,7 +38,8 @@ def normalize_learning_phrase(value) -> str:
     text = re.sub(r"\b20\d{2}\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\b(?:MES|PER[IÍ]ODO|A[NÑ]O)\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"(?:\s+\b(?:DE|DEL)\b)+\s*$", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s*[-/.,;:]+\s*$", "", text)
+    text = re.sub(r"^[\s\-_/.,;:|\u2013\u2014]+", "", text)
+    text = re.sub(r"[\s\-_/.,;:|\u2013\u2014]+$", "", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -60,6 +61,7 @@ class PipelineResult:
     header_rows: int
     validation_rows: int
     logs: list[str]
+    warnings: list[str]
 
     def to_dict(self) -> dict:
         return {
@@ -75,6 +77,7 @@ class PipelineResult:
             "header_rows": self.header_rows,
             "validation_rows": self.validation_rows,
             "logs": self.logs,
+            "warnings": self.warnings,
         }
 
 
@@ -332,6 +335,7 @@ class LeaseAccountingPipeline:
         self.base_output_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir = self.base_output_dir
         self.logs: list[str] = []
+        self.warnings: list[str] = []
         self.distribution_rules = pd.DataFrame()
         self.learning_dictionary_path = Path(learning_dictionary_path) if learning_dictionary_path else self.DEFAULT_LEARNING_DICTIONARY
         self.learning_dictionary = pd.DataFrame()
@@ -350,6 +354,7 @@ class LeaseAccountingPipeline:
         period: str | None = None,
     ) -> dict:
         self.logs = []
+        self.warnings = []
         run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M")
         self.output_dir = self.base_output_dir / run_folder_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -386,6 +391,7 @@ class LeaseAccountingPipeline:
         macro_template_path: Path | None = None,
         period: str | None = None,
     ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame]:
+        self.warnings = []
         self.learning_dictionary = self._load_learning_dictionary(self.learning_dictionary_path)
         data = self.load_data(
             invoices_path=invoices_path,
@@ -499,6 +505,7 @@ class LeaseAccountingPipeline:
                     + "."
                 )
 
+            self._warn_support_store_mismatches(invoices, invoice_supports)
             invoice_supports = self._apply_support_split_factors(invoice_supports)
             support_best = invoice_supports.sort_values(["invoice_key", "flags"], na_position="first").drop_duplicates("invoice_key")
             support_best = support_best.rename(
@@ -965,6 +972,7 @@ class LeaseAccountingPipeline:
             header_rows=len(header_export_df),
             validation_rows=len(validation_df),
             logs=self.logs.copy(),
+            warnings=self.warnings.copy(),
         )
 
     def _load_invoice_supports(
@@ -2510,7 +2518,12 @@ class LeaseAccountingPipeline:
 
     def _invoice_key(self, value) -> str | None:
         text = self._normalize_invoice_id(value)
-        return re.sub(r"[^A-Z0-9]", "", text.upper()) if text else None
+        if not text:
+            return None
+        key = re.sub(r"[^A-Z0-9]", "", text.upper())
+        if key.isdigit():
+            return key.lstrip("0") or "0"
+        return key
 
     def _normalize_invoice_id(self, value) -> str | None:
         text = self._clean_text(value)
@@ -2801,6 +2814,39 @@ class LeaseAccountingPipeline:
         stem = path.stem.upper()
         match = re.search(r"(^|[^A-Z0-9])([A-Z]{1,5}\d{2,5})(?=$|[^A-Z0-9])", stem)
         return match.group(2) if match else None
+
+    def _warn_support_store_mismatches(self, invoices: pd.DataFrame, supports: pd.DataFrame) -> None:
+        if invoices.empty or supports.empty:
+            return
+
+        for _, support in supports.iterrows():
+            source_file = self._clean_text(support.get("source_file"))
+            filename_store = self._extract_store_from_filename(Path(source_file)) if source_file else None
+            invoice_key = self._clean_text(support.get("invoice_key"))
+            if not filename_store or not invoice_key:
+                continue
+
+            matches = invoices[invoices["invoice_pdf_key"] == invoice_key]
+            expected_stores = sorted(
+                {
+                    store
+                    for store in matches.get("store", pd.Series(dtype=object)).map(self._clean_text).tolist()
+                    if store
+                }
+            )
+            if not expected_stores or self._text_key(filename_store) in {self._text_key(store) for store in expected_stores}:
+                continue
+
+            invoice_id = self._clean_text(support.get("invoice_id")) or "SIN_NUMERO"
+            expected_label = ", ".join(expected_stores)
+            warning = (
+                f"El archivo '{source_file}' indica la tienda {filename_store} en su nombre, pero la factura "
+                f"{invoice_id} pertenece a la tienda {expected_label} en el invoices file. "
+                "Revisa si el XML fue nombrado o enviado incorrectamente; el proceso continuó sin modificarlo."
+            )
+            if warning not in self.warnings:
+                self.warnings.append(warning)
+                self._log(f"WARNING: {warning}")
 
     def _log(self, message: str) -> None:
         LOGGER.info(message)
