@@ -163,8 +163,8 @@ class InvoiceSupportReader:
         )
         subtotal = self._parse_number(self._find_text(invoice_root, ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount"))
         total = self._parse_number(self._find_text(invoice_root, ".//cac:LegalMonetaryTotal/cbc:PayableAmount"))
-        detected_iva = self._extract_xml_tax_amount(invoice_root)
-        has_zero_iva_hint = detected_iva == 0 if detected_iva is not None else False
+        detected_iva = self._resolve_xml_tax_amount(invoice_root, subtotal, total)
+        has_zero_iva_hint = detected_iva == 0
         withholding_tax = self._extract_xml_withholding_tax(invoice_root)
         payment_terms_text = self._extract_xml_payment_terms(invoice_root)
         item_count_hint = self._extract_xml_item_count(invoice_root)
@@ -237,6 +237,59 @@ class InvoiceSupportReader:
             if value is not None:
                 return value
         return None
+
+    def _resolve_xml_tax_amount(
+        self,
+        root: ET.Element,
+        subtotal: float | None,
+        payable_total: float | None,
+    ) -> float:
+        explicit_tax = self._extract_xml_tax_amount(root)
+        if explicit_tax is not None:
+            return round(explicit_tax, 2)
+
+        line_extension = self._parse_number(
+            self._find_text(root, ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount")
+        )
+        if line_extension is None:
+            line_amounts = [
+                self._parse_number(self._find_text(line, "./cbc:LineExtensionAmount"))
+                for line in root.findall(".//cac:InvoiceLine", self.XML_NS)
+            ]
+            valid_line_amounts = [amount for amount in line_amounts if amount is not None]
+            if valid_line_amounts:
+                line_extension = round(sum(valid_line_amounts), 2)
+        allowance_total = self._parse_number(
+            self._find_text(root, ".//cac:LegalMonetaryTotal/cbc:AllowanceTotalAmount")
+        )
+        charge_total = self._parse_number(
+            self._find_text(root, ".//cac:LegalMonetaryTotal/cbc:ChargeTotalAmount")
+        )
+        tax_exclusive = self._parse_number(
+            self._find_text(root, ".//cac:LegalMonetaryTotal/cbc:TaxExclusiveAmount")
+        )
+        tax_inclusive = self._parse_number(
+            self._find_text(root, ".//cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount")
+        )
+
+        base_amount = line_extension if line_extension is not None else subtotal
+        if base_amount is not None:
+            base_amount = base_amount - (allowance_total or 0) + (charge_total or 0)
+
+        # Some vendor XMLs incorrectly report TaxExclusiveAmount as zero even
+        # when their invoice lines have a positive net amount.
+        if tax_exclusive is not None and (tax_exclusive != 0 or not base_amount):
+            base_amount = tax_exclusive
+
+        gross_amount = tax_inclusive if tax_inclusive is not None else payable_total
+        if base_amount is not None and gross_amount is not None:
+            inferred_tax = round(gross_amount - base_amount, 2)
+            if inferred_tax >= -0.01:
+                return max(inferred_tax, 0.0)
+
+        # Business rule: when an XML contains no VAT declaration and its
+        # monetary totals cannot provide a positive VAT difference, it is V0.
+        return 0.0
 
     def _extract_xml_withholding_tax(self, root: ET.Element) -> float | None:
         explicit_paths = [
