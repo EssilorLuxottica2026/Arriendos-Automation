@@ -590,7 +590,10 @@ class LeaseAccountingPipeline:
             )
             invoices["invoice_date"] = invoices["invoice_date"].fillna(invoices["support_invoice_date"])
             invoices["due_date"] = invoices["due_date"].fillna(invoices["support_due_date"])
-            invoices["vat"] = invoices["vat"].where(invoices["vat"].fillna(0) != 0, invoices["support_detected_iva"])
+            invoices["vat"] = invoices["vat"].where(
+                invoices["vat"].fillna(0) != 0,
+                invoices["support_detected_iva"],
+            ).fillna(0)
             invoices["total"] = invoices["total"].where(invoices["total"].fillna(0) != 0, invoices["support_total"])
             invoices["withholding_tax"] = invoices["withholding_tax"].combine_first(invoices["support_withholding_tax"])
             invoices["payment_terms_text"] = invoices["payment_terms_text"].combine_first(invoices["support_payment_terms_text"])
@@ -829,6 +832,7 @@ class LeaseAccountingPipeline:
         df["contract_status_blocked"] = df["status_en_rem"].map(self._is_blocked_contract_status)
         df["rent_type"] = np.where(df["contract_active"], "RF", "RV")
         df["account"] = np.where(df["contract_active"], self.FIXED_ACCOUNT, self.VARIABLE_ACCOUNT)
+        df["vat"] = pd.to_numeric(df["vat"], errors="coerce").fillna(0)
         df["vat_total"] = df["vat"].round(2)
         df["vat_vw"] = (df["vat"] * df["vw_percent"].fillna(0)).round(2)
         df["vat_vq"] = df["vat_vw"]
@@ -1538,13 +1542,11 @@ class LeaseAccountingPipeline:
             posting_date = invoice_date.strftime("%d-%m-%Y") if pd.notna(invoice_date) else None
             due_date_text = due_date.strftime("%d-%m-%Y") if pd.notna(due_date) else None
             period = invoice_date.strftime("%m") if pd.notna(invoice_date) else None
-            vat_total = row.get("vat_total")
+            vat_total = pd.to_numeric(pd.Series([row.get("vat_total")]), errors="coerce").fillna(0).iloc[0]
             amount = row.get("amount")
             invoice_total = row.get("invoice_total")
             withholding_tax_amount = row.get("withholding_tax_amount")
-            vat_code = None
-            if pd.notna(vat_total):
-                vat_code = "V0" if float(vat_total) == 0 else "I1"
+            vat_code = "V0" if float(vat_total) == 0 else "I1"
 
             data = {
                 "_posting_index": row.get("posting_index"),
@@ -1637,9 +1639,9 @@ class LeaseAccountingPipeline:
             },
             {
                 "column_name": "Total VAT Amount",
-                "fill_status": "partial",
-                "source": "PDF / invoice file",
-                "logic": "Filled when VAT is detected or explicitly zero; blank if unresolved.",
+                "fill_status": "fillable",
+                "source": "XML / invoice file",
+                "logic": "Uses detected VAT; XML invoices without a VAT value are treated as zero.",
             },
             {
                 "column_name": "Withholding Tax Amount",
@@ -1655,9 +1657,9 @@ class LeaseAccountingPipeline:
             },
             {
                 "column_name": "Vat Code",
-                "fill_status": "partial",
+                "fill_status": "fillable",
                 "source": "Derived rule",
-                "logic": "Uses V0 when VAT is zero, I1 when VAT is positive, blank when unresolved.",
+                "logic": "Uses V0 when VAT is zero or absent from XML, and I1 when VAT is positive.",
             },
             {
                 "column_name": "Post date",
@@ -1984,15 +1986,10 @@ class LeaseAccountingPipeline:
         }
 
     def _resolve_manual_header_vat_code(self, raw: pd.Series) -> str | None:
-        header_vat_code = raw.get("Vat Code")
-        total_vat = raw.get("Total VAT Amount")
-        if pd.notna(total_vat) and float(total_vat) > 0:
+        total_vat = pd.to_numeric(pd.Series([raw.get("Total VAT Amount")]), errors="coerce").fillna(0).iloc[0]
+        if float(total_vat) > 0:
             return "VQ"
-        if pd.notna(total_vat) and float(total_vat) == 0:
-            return "V0"
-        if pd.notna(header_vat_code):
-            return header_vat_code
-        return None
+        return "V0"
 
     def _resolve_manual_payment_terms(self, value) -> str | None:
         return self.PAYMENT_TERMS_DEFAULT
