@@ -29,8 +29,11 @@ tmp_*.xlsm
 tmp_*.csv
 
 # Common packaged artifacts
+build/
+dist/
 *.zip
 *.log
+*.spec
 
 # OS noise
 .DS_Store

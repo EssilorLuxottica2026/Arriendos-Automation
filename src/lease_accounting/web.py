@@ -17,16 +17,21 @@ from flask import (
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 
+from .pipeline.pdf_reader import InvoiceSupportReader, NonInvoiceUBLDocument
 from .pipeline.processor import LeaseAccountingPipeline, PipelineError, normalize_learning_phrase
+from .runtime import (
+    DATA_DIR,
+    DICTIONARY_BACKUP_DIR,
+    INPUT_DIR,
+    LEARNING_DICTIONARY_PATH,
+    OUTPUT_DIR,
+    RAW_DIR,
+    RESOURCE_DIR,
+    UPLOAD_DIR,
+)
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
-UPLOAD_DIR = DATA_DIR / "uploads"
-OUTPUT_DIR = DATA_DIR / "output"
-INPUT_DIR = DATA_DIR / "input"
-RAW_DIR = DATA_DIR / "raw"
-LEARNING_DICTIONARY_PATH = BASE_DIR / "Diccionario_Conceptos_Simple.xlsx"
+BASE_DIR = RESOURCE_DIR
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".csv", ".xml"}
 SUPPORT_EXTENSIONS = {".pdf", ".xml"}
 
@@ -129,7 +134,7 @@ def _load_review_job(batch_id: str) -> dict:
 
 def _run_pipeline_from_job(job: dict) -> dict:
     pipeline = LeaseAccountingPipeline(output_dir=OUTPUT_DIR, learning_dictionary_path=LEARNING_DICTIONARY_PATH)
-    return pipeline.run(
+    result = pipeline.run(
         invoices_path=Path(job["invoices_path"]),
         control_path=Path(job["control_path"]),
         contracts_path=Path(job["contracts_path"]),
@@ -140,7 +145,109 @@ def _run_pipeline_from_job(job: dict) -> dict:
         support_split_factors=job.get("support_split_factors") or None,
         macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
         period=job.get("period") or None,
+        contract_selections=job.get("contract_selections") or None,
+        discount_selections=job.get("discount_selections") or None,
     )
+    manual_processing_files = job.get("manual_processing_files", [])
+    result["manual_processing_files"] = manual_processing_files
+    result.setdefault("processing_issues", [])
+    result["processing_issues"].extend(
+        {
+            "invoice_id": "No identificada",
+            "source_file": item.get("filename"),
+            "store": None,
+            "location": item.get("filename") or "Archivo UBL sin nombre",
+            "problem": (
+                f"Es un documento UBL {item.get('document_type') or 'no identificado'}, "
+                "no una factura XML. Debe procesarse manualmente."
+            ),
+            "issue_type": "non_invoice_ubl",
+        }
+        for item in manual_processing_files
+    )
+    return result
+
+
+def _prepare_pipeline_from_job(job: dict):
+    pipeline = LeaseAccountingPipeline(output_dir=OUTPUT_DIR, learning_dictionary_path=LEARNING_DICTIONARY_PATH)
+    data, output_df, validation_df = pipeline.prepare(
+        invoices_path=Path(job["invoices_path"]),
+        control_path=Path(job["control_path"]),
+        contracts_path=Path(job["contracts_path"]),
+        prorateo_path=Path(job["prorateo_path"]),
+        distribution_path=Path(job["distribution_path"]),
+        history_path=Path(job["history_path"]) if job.get("history_path") else None,
+        support_paths=[Path(path) for path in job.get("support_paths", [])],
+        support_split_factors=job.get("support_split_factors") or None,
+        macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
+        period=job.get("period") or None,
+        contract_selections=job.get("contract_selections") or None,
+        discount_selections=job.get("discount_selections") or None,
+    )
+    return pipeline, data, output_df, validation_df
+
+
+def _continue_processing_job(batch_id: str, job: dict):
+    pipeline, _, output_df, _ = _prepare_pipeline_from_job(job)
+    manual_processing_files = job.get("manual_processing_files", [])
+    if pipeline.discount_review_items:
+        _save_review_job(batch_id, job)
+        return render_template(
+            "discount_review.html",
+            batch_id=batch_id,
+            items=pipeline.discount_review_items,
+            warnings=pipeline.warnings,
+            manual_processing_files=manual_processing_files,
+        )
+
+    if pipeline.contract_review_items:
+        _save_review_job(batch_id, job)
+        return render_template(
+            "contract_review.html",
+            batch_id=batch_id,
+            items=pipeline.contract_review_items,
+            warnings=pipeline.warnings,
+            manual_processing_files=manual_processing_files,
+        )
+
+    review_items = pipeline.build_concept_review_items(output_df)
+    if review_items:
+        _save_review_job(batch_id, job)
+        return render_template(
+            "concept_review.html",
+            batch_id=batch_id,
+            items=review_items,
+            concepts=pipeline.learning_concepts(),
+            warnings=pipeline.warnings,
+            manual_processing_files=manual_processing_files,
+        )
+
+    result = _run_pipeline_from_job(job)
+    return render_template("result.html", result=result)
+
+
+def _separate_non_invoice_xmls(
+    support_paths: list[Path],
+    display_names: dict[str, str] | None = None,
+) -> tuple[list[Path], list[dict]]:
+    valid_paths = []
+    manual_files = []
+    reader = InvoiceSupportReader()
+    for path in support_paths:
+        if path.suffix.lower() != ".xml":
+            valid_paths.append(path)
+            continue
+        try:
+            reader.parse_file(path)
+            valid_paths.append(path)
+        except NonInvoiceUBLDocument as exc:
+            manual_files.append(
+                {
+                    "filename": (display_names or {}).get(str(path), exc.filename),
+                    "document_type": exc.document_type,
+                }
+            )
+    return valid_paths, manual_files
 
 
 def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
@@ -192,10 +299,14 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
                 existing_keys.add(phrase.upper())
         sheet.cell(row_idx, phrases_col).value = ", ".join(existing)
 
+    _backup_learning_dictionary()
     try:
         workbook.save(LEARNING_DICTIONARY_PATH)
     except PermissionError as exc:
-        raise PipelineError("No pude guardar el diccionario. Cierra Diccionario_Conceptos_Simple.xlsx e intenta de nuevo.") from exc
+        raise PipelineError(
+            "No pude guardar el diccionario. Cierra Diccionario_Conceptos_Simple.xlsx "
+            "y comprueba que la carpeta de la aplicacion tenga permisos de escritura."
+        ) from exc
 
 
 @app.route("/", methods=["GET"])
@@ -223,6 +334,30 @@ def _load_dictionary_workbook():
         return load_workbook(LEARNING_DICTIONARY_PATH)
     except PermissionError as exc:
         raise PipelineError("Cierra Diccionario_Conceptos_Simple.xlsx para modificar la configuracion.") from exc
+
+
+def _backup_learning_dictionary() -> Path:
+    if not LEARNING_DICTIONARY_PATH.exists():
+        raise PipelineError(f"No existe el diccionario de conceptos: {LEARNING_DICTIONARY_PATH.name}")
+    DICTIONARY_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    backup_path = DICTIONARY_BACKUP_DIR / f"{LEARNING_DICTIONARY_PATH.stem}_{timestamp}.xlsx"
+    try:
+        shutil.copy2(LEARNING_DICTIONARY_PATH, backup_path)
+    except PermissionError as exc:
+        raise PipelineError(
+            "No pude respaldar el diccionario. Cierra Diccionario_Conceptos_Simple.xlsx "
+            "y comprueba los permisos de la carpeta."
+        ) from exc
+
+    backups = sorted(
+        DICTIONARY_BACKUP_DIR.glob(f"{LEARNING_DICTIONARY_PATH.stem}_*.xlsx"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for old_backup in backups[20:]:
+        old_backup.unlink(missing_ok=True)
+    return backup_path
 
 
 def _validate_concept_account(concept: str, account: str) -> tuple[str, str]:
@@ -284,10 +419,14 @@ def settings():
             elif action != "delete":
                 raise PipelineError("Accion de configuracion no valida.")
 
+            _backup_learning_dictionary()
             try:
                 workbook.save(LEARNING_DICTIONARY_PATH)
             except PermissionError as exc:
-                raise PipelineError("Cierra Diccionario_Conceptos_Simple.xlsx antes de guardar los cambios.") from exc
+                raise PipelineError(
+                    "Cierra Diccionario_Conceptos_Simple.xlsx y comprueba que la carpeta "
+                    "de la aplicacion tenga permisos de escritura."
+                ) from exc
             flash(success_message, "success")
             return redirect(url_for("settings"))
 
@@ -312,6 +451,13 @@ def settings():
 
 @app.route("/process", methods=["POST"])
 def process():
+    if not LEARNING_DICTIONARY_PATH.exists():
+        flash(
+            "No se encontro Diccionario_Conceptos_Simple.xlsx junto a la aplicacion. "
+            "Colocalo en la misma carpeta que el ejecutable antes de procesar."
+        )
+        return redirect(url_for("index"))
+
     invoices_file = request.files.get("invoices_file")
     if not invoices_file or not invoices_file.filename:
         flash("Por favor, sube el archivo de facturas consolidado (Invoices file).")
@@ -333,16 +479,37 @@ def process():
         macro_workbook_path = _resolve_and_save_master("macro_workbook_file", request.files.get("macro_workbook_file"), batch_dir)
 
         support_paths = []
+        support_display_names = {}
         support_split_factors = {}
         for support_file in request.files.getlist("invoice_support_files"):
             if support_file and support_file.filename:
-                support_paths.append(_save_upload(support_file, batch_dir, allowed_extensions=SUPPORT_EXTENSIONS))
+                support_path = _save_upload(support_file, batch_dir, allowed_extensions=SUPPORT_EXTENSIONS)
+                support_paths.append(support_path)
+                support_display_names[str(support_path)] = support_file.filename
         for field_name, split_factor in [("invoice_support_files_split_2", 2), ("invoice_support_files_split_3", 3)]:
             for support_file in request.files.getlist(field_name):
                 if support_file and support_file.filename:
                     support_path = _save_upload(support_file, batch_dir, allowed_extensions=SUPPORT_EXTENSIONS)
                     support_paths.append(support_path)
+                    support_display_names[str(support_path)] = support_file.filename
                     support_split_factors[str(support_path)] = split_factor
+
+        support_paths, manual_processing_files = _separate_non_invoice_xmls(
+            support_paths,
+            display_names=support_display_names,
+        )
+        valid_support_keys = {str(path) for path in support_paths}
+        support_split_factors = {
+            path: factor
+            for path, factor in support_split_factors.items()
+            if path in valid_support_keys
+        }
+
+        if manual_processing_files and not support_paths:
+            return render_template(
+                "index.html",
+                manual_processing_files=manual_processing_files,
+            )
 
         period = request.form.get("period", "").strip()
         job = {
@@ -356,34 +523,36 @@ def process():
             "support_split_factors": support_split_factors,
             "macro_template_path": str(macro_workbook_path) if macro_workbook_path else None,
             "period": period or None,
+            "manual_processing_files": manual_processing_files,
+            "contract_selections": {},
+            "discount_selections": {},
         }
+        return _continue_processing_job(batch_id, job)
+    except PipelineError as exc:
+        if "Todas las facturas del lote se marcaron para procesamiento manual" in str(exc):
+            flash(str(exc), "warning")
+        else:
+            flash(str(exc))
+        return redirect(url_for("index"))
+    except Exception as exc:  # pragma: no cover
+        flash(f"Unexpected error: {exc}")
+        return redirect(url_for("index"))
 
-        pipeline = LeaseAccountingPipeline(output_dir=OUTPUT_DIR, learning_dictionary_path=LEARNING_DICTIONARY_PATH)
-        data, output_df, validation_df = pipeline.prepare(
-            invoices_path=invoices_path,
-            control_path=control_path,
-            contracts_path=contracts_path,
-            prorateo_path=prorateo_path,
-            distribution_path=distribution_path,
-            history_path=history_path,
-            support_paths=support_paths,
-            support_split_factors=support_split_factors or None,
-            macro_template_path=macro_workbook_path,
-            period=period or None,
-        )
-        review_items = pipeline.build_concept_review_items(output_df)
-        if review_items:
-            _save_review_job(batch_id, job)
-            concepts = pipeline.learning_concepts()
-            return render_template(
-                "concept_review.html",
-                batch_id=batch_id,
-                items=review_items,
-                concepts=concepts,
-                warnings=pipeline.warnings,
-            )
-
-        result = _run_pipeline_from_job(job)
+@app.route("/contract-review/<batch_id>", methods=["POST"])
+def contract_review(batch_id: str):
+    try:
+        job = _load_review_job(batch_id)
+        item_count = int(request.form.get("item_count", "0"))
+        selections = dict(job.get("contract_selections") or {})
+        for idx in range(item_count):
+            ceco = request.form.get(f"ceco_{idx}", "").strip()
+            contract_key = request.form.get(f"contract_{idx}", "").strip()
+            if not ceco or not contract_key:
+                raise PipelineError("Selecciona un contrato para cada CECO con estados contradictorios.")
+            selections[ceco] = contract_key
+        job["contract_selections"] = selections
+        _save_review_job(batch_id, job)
+        return _continue_processing_job(batch_id, job)
     except PipelineError as exc:
         flash(str(exc))
         return redirect(url_for("index"))
@@ -391,7 +560,32 @@ def process():
         flash(f"Unexpected error: {exc}")
         return redirect(url_for("index"))
 
-    return render_template("result.html", result=result)
+
+@app.route("/discount-review/<batch_id>", methods=["POST"])
+def discount_review(batch_id: str):
+    try:
+        job = _load_review_job(batch_id)
+        item_count = int(request.form.get("item_count", "0"))
+        selections = dict(job.get("discount_selections") or {})
+        valid_actions = {"apply", "omit", "skip"}
+        for idx in range(item_count):
+            review_key = request.form.get(f"review_key_{idx}", "").strip()
+            action = request.form.get(f"discount_action_{idx}", "").strip().lower()
+            if not review_key or action not in valid_actions:
+                raise PipelineError("Selecciona una accion para cada descuento que requiere revision.")
+            selections[review_key] = action
+        job["discount_selections"] = selections
+        _save_review_job(batch_id, job)
+        return _continue_processing_job(batch_id, job)
+    except PipelineError as exc:
+        if "Todas las facturas del lote se marcaron para procesamiento manual" in str(exc):
+            flash(str(exc), "warning")
+        else:
+            flash(str(exc))
+        return redirect(url_for("index"))
+    except Exception as exc:  # pragma: no cover
+        flash(f"Unexpected error: {exc}")
+        return redirect(url_for("index"))
 
 
 @app.route("/concept-review/<batch_id>", methods=["POST"])

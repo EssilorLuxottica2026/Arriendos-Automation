@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Revision de descuentos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="discount-review-page modal-open">
+    <main class="page contract-review-background" aria-hidden="true">
+        <nav class="brand-bar">
+            <a class="brand-home" href="{{ url_for('index') }}" aria-label="Ir a la pagina principal">
+                <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            </a>
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+        </nav>
+        <section class="panel">
+            <h1>Revision de descuentos</h1>
+            <p class="lede">El lote esta en pausa mientras confirmas los descuentos que dependen de requisitos externos.</p>
+        </section>
+    </main>
+
+    <div class="contract-review-modal discount-review-modal" role="dialog" aria-modal="true" aria-labelledby="discountReviewTitle">
+        <div class="manual-modal-backdrop"></div>
+        <form action="{{ url_for('discount_review', batch_id=batch_id) }}" method="post" class="contract-review-dialog discount-review-dialog">
+            <header class="contract-review-header">
+                <div class="manual-modal-icon" aria-hidden="true">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M17 6.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div>
+                    <p class="manual-modal-eyebrow">Decision requerida</p>
+                    <h2 id="discountReviewTitle">Confirma el tratamiento del descuento</h2>
+                    <p>La condicion no incluye una fecha o plazo que la app pueda comprobar. Elige una accion para cada factura.</p>
+                </div>
+            </header>
+
+            <input type="hidden" name="item_count" value="{{ items|length }}">
+            <div class="contract-conflict-list">
+                {% for item in items %}
+                    {% set idx = loop.index0 %}
+                    <fieldset class="contract-conflict discount-conflict">
+                        <input type="hidden" name="review_key_{{ idx }}" value="{{ item.review_key }}">
+                        <legend>
+                            <strong>Factura {{ item.invoice_id }}</strong>
+                            <span>{{ item.source_file }} &middot; {{ item.store }} &middot; CeCo {{ item.ceco }}</span>
+                        </legend>
+
+                        <div class="discount-summary">
+                            <span><small>Descuento detectado</small><strong>{{ "{:,.0f}".format(item.amount) }}</strong></span>
+                            {% if item.percentage is not none %}
+                                <span><small>Porcentaje</small><strong>{{ "{:g}".format(item.percentage) }}%</strong></span>
+                            {% endif %}
+                        </div>
+                        <blockquote>{{ item.condition }}</blockquote>
+
+                        <div class="discount-action-list">
+                            <label class="discount-action discount-action-apply">
+                                <input type="radio" name="discount_action_{{ idx }}" value="apply" required>
+                                <span class="discount-action-icon" aria-hidden="true">+</span>
+                                <span><strong>Aplicar descuento</strong><small>Incluye el incentivo y genera la linea contable 50.</small></span>
+                            </label>
+                            <label class="discount-action discount-action-omit">
+                                <input type="radio" name="discount_action_{{ idx }}" value="omit" required>
+                                <span class="discount-action-icon" aria-hidden="true">-</span>
+                                <span><strong>No aplicar descuento</strong><small>Procesa la factura sin descontar este incentivo.</small></span>
+                            </label>
+                            <label class="discount-action discount-action-skip">
+                                <input type="radio" name="discount_action_{{ idx }}" value="skip" required>
+                                <span class="discount-action-icon" aria-hidden="true">x</span>
+                                <span><strong>Procesar manualmente</strong><small>Omite toda la factura y no genera ningun CSV para ella.</small></span>
+                            </label>
+                        </div>
+                    </fieldset>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="manual-modal-confirm">Confirmar decisiones y continuar</button>
+        </form>
+    </div>
+</body>
+</html>
