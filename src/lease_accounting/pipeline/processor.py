@@ -346,6 +346,7 @@ class LeaseAccountingPipeline:
         history_path: Path | None = None,
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
+        support_split_weights: dict[str, list[str | float]] | None = None,
         macro_template_path: Path | None = None,
         period: str | None = None,
         contract_selections: dict[str, str] | None = None,
@@ -367,6 +368,7 @@ class LeaseAccountingPipeline:
             history_path=history_path,
             support_paths=support_paths,
             support_split_factors=support_split_factors,
+            support_split_weights=support_split_weights,
             macro_template_path=macro_template_path,
             period=period,
             contract_selections=contract_selections,
@@ -389,6 +391,7 @@ class LeaseAccountingPipeline:
         history_path: Path | None = None,
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
+        support_split_weights: dict[str, list[str | float]] | None = None,
         macro_template_path: Path | None = None,
         period: str | None = None,
         contract_selections: dict[str, str] | None = None,
@@ -407,6 +410,7 @@ class LeaseAccountingPipeline:
             history_path=history_path,
             support_paths=support_paths,
             support_split_factors=support_split_factors,
+            support_split_weights=support_split_weights,
             macro_template_path=macro_template_path,
         )
         data = self.clean_data(data)
@@ -429,6 +433,7 @@ class LeaseAccountingPipeline:
         history_path: Path | None = None,
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
+        support_split_weights: dict[str, list[str | float]] | None = None,
         macro_template_path: Path | None = None,
     ) -> dict[str, pd.DataFrame]:
         self._log("Loading input files.")
@@ -439,7 +444,11 @@ class LeaseAccountingPipeline:
             "prorateo": self._load_prorateo(prorateo_path),
             "distribution": self._load_distribution(distribution_path),
             "history": self._safe_read_table(history_path) if history_path else pd.DataFrame(),
-            "invoice_supports": self._load_invoice_supports(support_paths or [], support_split_factors=support_split_factors),
+            "invoice_supports": self._load_invoice_supports(
+                support_paths or [],
+                support_split_factors=support_split_factors,
+                support_split_weights=support_split_weights,
+            ),
             "macro_database": self._load_macro_database(macro_template_path) if macro_template_path else pd.DataFrame(),
         }
 
@@ -460,6 +469,8 @@ class LeaseAccountingPipeline:
                     "invoice_discounts",
                     "discounts",
                     "support_discounts",
+                    "split_weights",
+                    "support_split_weights",
                 }:
                     continue
                 if df[col].dtype == object:
@@ -481,6 +492,7 @@ class LeaseAccountingPipeline:
             "withholding_tax",
             "payment_terms_text",
             "item_count_hint",
+            "ubl_document_type",
             "invoice_line_items",
             "invoice_discounts",
             "payable_rounding",
@@ -631,6 +643,7 @@ class LeaseAccountingPipeline:
             support_best = support_best.rename(
                 columns={
                     "source_file": "support_source_file",
+                    "document_type": "support_ubl_document_type",
                     "invoice_date": "support_invoice_date",
                     "due_date": "support_due_date",
                     "subtotal": "support_subtotal",
@@ -643,6 +656,7 @@ class LeaseAccountingPipeline:
                     "discounts": "support_discounts",
                     "payable_rounding": "support_payable_rounding",
                     "split_factor": "support_split_factor",
+                    "split_weights": "support_split_weights",
                     "flags": "support_flags",
                 }
             )
@@ -652,6 +666,7 @@ class LeaseAccountingPipeline:
                         "invoice_key",
                         "invoice_nit_key",
                         "support_source_file",
+                        "support_ubl_document_type",
                         "support_invoice_date",
                         "support_due_date",
                         "support_subtotal",
@@ -664,6 +679,7 @@ class LeaseAccountingPipeline:
                         "support_discounts",
                         "support_payable_rounding",
                         "support_split_factor",
+                        "support_split_weights",
                         "support_flags",
                     ]
                 ],
@@ -680,6 +696,9 @@ class LeaseAccountingPipeline:
             invoices["withholding_tax"] = invoices["withholding_tax"].combine_first(invoices["support_withholding_tax"])
             invoices["payment_terms_text"] = invoices["payment_terms_text"].combine_first(invoices["support_payment_terms_text"])
             invoices["item_count_hint"] = invoices["item_count_hint"].combine_first(invoices["support_item_count_hint"])
+            invoices["ubl_document_type"] = invoices["ubl_document_type"].combine_first(
+                invoices["support_ubl_document_type"]
+            ).fillna("Invoice")
             invoices["invoice_line_items"] = invoices["invoice_line_items"].where(
                 invoices["invoice_line_items"].map(lambda value: isinstance(value, list) and len(value) > 0),
                 invoices["support_line_items"],
@@ -701,6 +720,7 @@ class LeaseAccountingPipeline:
                 )
             invoices["support_flags"] = None
             invoices["support_source_file"] = None
+            invoices["ubl_document_type"] = invoices["ubl_document_type"].fillna("Invoice")
             invoices["support_split_factor"] = 1
             invoices["support_split_index"] = 1
 
@@ -1080,6 +1100,7 @@ class LeaseAccountingPipeline:
                 "due_date",
                 "payment_terms_text",
                 "item_count_hint",
+                "ubl_document_type",
                 "invoice_line_items",
                 "invoice_discounts",
                 "detected_invoice_discounts",
@@ -1101,9 +1122,9 @@ class LeaseAccountingPipeline:
         macro_database_df: pd.DataFrame,
         macro_template_path: Path | None = None,
     ) -> PipelineResult:
-        self._log("Writing Allocated Costs CSV and individual invoice ZIP bundles.")
+        self._log("Writing per-invoice Allocated Costs CSV ZIP and individual invoice ZIP bundles.")
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-        csv_name = f"allocated_costs_{timestamp}.csv"
+        allocated_bundle_name = f"allocated_costs_csv_bundle_{timestamp}.zip"
         invoice_bundle_name = f"output_invoice_csv_bundle_{timestamp}.zip"
         manual_style_bundle_name = f"output_manual_style_csv_bundle_{timestamp}.zip"
 
@@ -1136,8 +1157,12 @@ class LeaseAccountingPipeline:
             macro_database_df=macro_database_df,
             macro_template_path=macro_template_path,
         )
-        lucy_export_visible_df = lucy_export_df.drop(columns=["_posting_index"], errors="ignore")
-        lucy_export_visible_df.to_csv(self.output_dir / csv_name, index=False, encoding="utf-8-sig")
+        self._write_allocated_costs_csv_bundle(
+            summary_df=summary_df,
+            lucy_export_df=lucy_export_df,
+            bundle_name=allocated_bundle_name,
+            timestamp=timestamp,
+        )
         self._write_invoice_csv_bundle(
             summary_df=summary_df,
             header_export_df=header_export_df,
@@ -1163,7 +1188,7 @@ class LeaseAccountingPipeline:
 
         run_folder_name = self.output_dir.name
         return PipelineResult(
-            output_csv=f"{run_folder_name}/{csv_name}",
+            output_csv=f"{run_folder_name}/{allocated_bundle_name}",
             invoice_csv_bundle=f"{run_folder_name}/{invoice_bundle_name}",
             manual_style_csv_bundle=f"{run_folder_name}/{manual_style_bundle_name}",
             output_rows=len(summary_df),
@@ -1178,6 +1203,7 @@ class LeaseAccountingPipeline:
         self,
         support_paths: list[Path],
         support_split_factors: dict[str, int] | None = None,
+        support_split_weights: dict[str, list[str | float]] | None = None,
     ) -> pd.DataFrame:
         if not support_paths:
             return pd.DataFrame()
@@ -1187,9 +1213,23 @@ class LeaseAccountingPipeline:
             Path(path).name: max(int(factor or 1), 1)
             for path, factor in (support_split_factors or {}).items()
         }
+        split_weights_by_name = {
+            Path(path).name: weights
+            for path, weights in (support_split_weights or {}).items()
+        }
         df["split_factor"] = df["source_file"].map(split_factor_by_name).fillna(1).astype(int)
+        df["split_weights"] = df.apply(
+            lambda row: self._valid_split_weights(
+                split_weights_by_name.get(row["source_file"]),
+                int(row["split_factor"]),
+            ),
+            axis=1,
+        )
         for _, row in df.iterrows():
-            split_note = f", Split: {row['split_factor']} tiendas" if int(row.get("split_factor") or 1) > 1 else ""
+            split_note = ""
+            if int(row.get("split_factor") or 1) > 1:
+                percentages = "/".join(f"{float(value):g}%" for value in row["split_weights"])
+                split_note = f", Split: {row['split_factor']} tiendas ({percentages})"
             self._log(
                 f"  Support File parsed: {row['source_file']} ({row['source_type'].upper()}) -> "
                 f"Invoice_ID: {row['invoice_id']}, Date: {row['invoice_date']}, "
@@ -1197,6 +1237,15 @@ class LeaseAccountingPipeline:
                 f"Withholding: {row['withholding_tax']}{split_note}, Flags: {row['flags']}"
             )
         return df
+
+    @staticmethod
+    def _valid_split_weights(weights, split_factor: int) -> list[float]:
+        if not isinstance(weights, (list, tuple)) or len(weights) != split_factor:
+            return [1.0] * split_factor
+        parsed = pd.to_numeric(pd.Series(weights), errors="coerce")
+        if parsed.isna().any() or (parsed <= 0).any() or float(parsed.sum()) <= 0:
+            return [1.0] * split_factor
+        return parsed.astype(float).tolist()
 
     def _apply_support_split_factors(self, supports: pd.DataFrame) -> pd.DataFrame:
         df = supports.copy()
@@ -1248,6 +1297,11 @@ class LeaseAccountingPipeline:
         expanded_rows = []
         for _, row in invoices.iterrows():
             split_factor = int(row.get("support_split_factor") or 1)
+            split_weights = self._valid_split_weights(
+                row.get("support_split_weights"),
+                split_factor,
+            )
+            residual_index = split_factor - 1
             monetary_allocations = {}
             for col in [
                 "total",
@@ -1267,19 +1321,36 @@ class LeaseAccountingPipeline:
                 if pd.notna(value):
                     monetary_allocations[col] = allocate_cop(
                         value,
-                        [1] * split_factor,
-                        residual_index=split_factor - 1,
+                        split_weights,
+                        residual_index=residual_index,
                     )
-            split_items = self._split_invoice_line_items(row.get("invoice_line_items"), split_factor)
-            split_discounts = self._split_invoice_discounts(row.get("invoice_discounts"), split_factor)
+            split_items = self._allocate_invoice_line_items(
+                row.get("invoice_line_items"),
+                split_weights,
+                residual_index,
+            )
+            split_discounts = self._allocate_invoice_discounts(
+                row.get("invoice_discounts"),
+                split_weights,
+                residual_index,
+            )
             for split_index in range(1, split_factor + 1):
                 new_row = row.copy()
                 new_row["support_split_index"] = split_index
+                new_row["support_split_percent"] = (
+                    float(split_weights[split_index - 1]) / sum(split_weights) * 100
+                )
                 for col, values in monetary_allocations.items():
                     new_row[col] = values[split_index - 1]
                 new_row["invoice_line_items"] = split_items[split_index - 1]
                 new_row["invoice_discounts"] = split_discounts[split_index - 1]
                 expanded_rows.append(new_row)
+            if split_factor > 1:
+                percentages = "/".join(f"{value:g}%" for value in split_weights)
+                self._log(
+                    f"  Invoice [{row.get('invoice_id')}]: split into {split_factor} files "
+                    f"using {percentages}."
+                )
         return pd.DataFrame(expanded_rows).reset_index(drop=True)
 
     def _load_invoices(self, path: Path) -> pd.DataFrame:
@@ -1303,7 +1374,13 @@ class LeaseAccountingPipeline:
                         "numero_de_documento",
                         "documento",
                     ],
-                    "vendor": ["vendor", "sap_vendor_code", "vendor_code", "acreedor"],
+                    "vendor": [
+                        "vendor",
+                        "sap_vendor_code",
+                        "vendor_code",
+                        "acreedor",
+                        "acreedor_administracion",
+                    ],
                     "supplier_nit": ["supplier_nit", "nit", "tax_id", "identificacion_fiscal"],
                     "store": ["store", "tienda", "local"],
                     "reference": ["reference", "referencia", "centro"],
@@ -1345,6 +1422,7 @@ class LeaseAccountingPipeline:
             "invoice_id": parsed.invoice_id,
             "vendor": parsed.supplier_id,
             "supplier_nit": parsed.supplier_id,
+            "ubl_document_type": parsed.document_type,
             "vendor_name": parsed.supplier_name,
             "store": store,
             "reference": parsed.invoice_id,
@@ -2195,6 +2273,34 @@ class LeaseAccountingPipeline:
         ]
         return pd.DataFrame(rows)
 
+    def _write_allocated_costs_csv_bundle(
+        self,
+        summary_df: pd.DataFrame,
+        lucy_export_df: pd.DataFrame,
+        bundle_name: str,
+        timestamp: str,
+    ) -> None:
+        bundle_dir = self.output_dir / f"allocated_costs_csvs_{timestamp}"
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+
+        for _, summary_row in summary_df.dropna(subset=["invoice_id"]).iterrows():
+            safe_invoice_id = self._posting_file_stem(summary_row)
+            allocated_slice = self._lucy_slice_for_posting(lucy_export_df, summary_row)
+            if allocated_slice.empty:
+                visible_columns = lucy_export_df.drop(
+                    columns=["_posting_index"],
+                    errors="ignore",
+                ).columns
+                allocated_slice = pd.DataFrame(columns=visible_columns)
+
+            file_path = bundle_dir / f"{safe_invoice_id}_allocated_costs.csv"
+            allocated_slice.to_csv(file_path, index=False, encoding="utf-8-sig")
+
+        zip_path = self.output_dir / bundle_name
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+            for file_path in bundle_dir.glob("*.csv"):
+                zip_file.write(file_path, arcname=file_path.name)
+
     def _write_invoice_csv_bundle(
         self,
         summary_df: pd.DataFrame,
@@ -2548,7 +2654,18 @@ class LeaseAccountingPipeline:
             summary_df["support_split_index"] = summary_df["posting_index"]
         if "support_split_factor" not in summary_df.columns:
             summary_df["support_split_factor"] = summary_df["posting_count"]
-        summary_df["document_type"] = "Supplier Invoice"
+        summary_df["is_credit_note"] = (
+            summary_df.get("ubl_document_type", pd.Series(index=summary_df.index, dtype=object))
+            .fillna("Invoice")
+            .astype(str)
+            .str.casefold()
+            .eq("creditnote")
+        )
+        summary_df["document_type"] = np.where(
+            summary_df["is_credit_note"],
+            "Supplier Credit Note",
+            "Supplier Invoice",
+        )
         summary_df["movement_type"] = "5-FI"
         summary_df["currency"] = "COP"
         summary_df["invoice_total"] = (
@@ -2598,6 +2715,7 @@ class LeaseAccountingPipeline:
                 "item_count_hint",
                 "invoice_line_items",
                 "vat_status",
+                "is_credit_note",
             ]
         ].copy()
 
@@ -2617,6 +2735,7 @@ class LeaseAccountingPipeline:
                 "reference": row["reference"],
                 "concept": row["concept"],
                 "text": row["text"],
+                "is_credit_note": row["is_credit_note"],
             }
 
             item_rows = []
@@ -2743,6 +2862,14 @@ class LeaseAccountingPipeline:
             lines_df["amount"] = pd.to_numeric(lines_df["amount"], errors="coerce").map(
                 lambda value: round_cop(value, 0)
             )
+            credit_note_mask = lines_df["is_credit_note"].fillna(False).astype(bool)
+            lines_df.loc[credit_note_mask, "posting_key"] = (
+                lines_df.loc[credit_note_mask, "posting_key"]
+                .astype(str)
+                .map({"40": "50", "50": "40"})
+                .fillna(lines_df.loc[credit_note_mask, "posting_key"])
+            )
+            lines_df = lines_df.drop(columns=["is_credit_note"])
 
         summary_df = summary_df[
             [
@@ -2777,6 +2904,8 @@ class LeaseAccountingPipeline:
                 "support_split_factor",
                 "invoice_total",
                 "vat_status",
+                "ubl_document_type",
+                "is_credit_note",
             ]
         ].copy()
 
@@ -3085,6 +3214,12 @@ class LeaseAccountingPipeline:
         text = self._clean_text(value)
         if not text:
             return None
+        text = re.sub(
+            r"^\s*NOTA\s+CR[EÉ]DITO\s*[:#-]?\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
         if re.fullmatch(r"\d+\.0", text):
             text = text[:-2]
         text = text.replace(" ", "")

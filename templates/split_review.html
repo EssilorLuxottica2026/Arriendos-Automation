@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Distribución entre tiendas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="split-review-page modal-open">
+    <main class="page contract-review-background" aria-hidden="true">
+        <nav class="brand-bar">
+            <a class="brand-home" href="{{ url_for('index') }}" aria-label="Ir a la pagina principal">
+                <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            </a>
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+        </nav>
+        <section class="panel">
+            <h1>Distribución entre tiendas</h1>
+            <p class="lede">El lote está en pausa mientras confirmas los porcentajes de las facturas compartidas.</p>
+        </section>
+    </main>
+
+    <div class="contract-review-modal split-review-modal" role="dialog" aria-modal="true" aria-labelledby="splitReviewTitle">
+        <div class="manual-modal-backdrop"></div>
+        <form action="{{ url_for('split_review', batch_id=batch_id) }}" method="post" class="contract-review-dialog split-review-dialog" id="splitReviewForm">
+            <header class="contract-review-header">
+                <div class="manual-modal-icon" aria-hidden="true">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8M6 4h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 13h8m-10-3h12a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="manual-modal-eyebrow">Distribución requerida</p>
+                    <h2 id="splitReviewTitle">Confirma el porcentaje de cada archivo</h2>
+                    <p>El reparto equitativo está seleccionado por defecto. Personaliza únicamente las facturas que tengan otra distribución.</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="split-review-errors" role="alert">
+                        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <input type="hidden" name="item_count" value="{{ items|length }}">
+            <div class="split-review-list">
+                {% for item in items %}
+                    {% set idx = loop.index0 %}
+                    <fieldset
+                        class="split-review-item"
+                        data-split-item
+                        data-total="{{ item.total if item.total is not none else '' }}"
+                        data-factor="{{ item.split_factor }}"
+                    >
+                        <legend>
+                            <span class="split-invoice-title">Factura {{ item.invoice_id }}</span>
+                            <span class="split-store-count">{{ item.split_factor }} tiendas</span>
+                        </legend>
+
+                        <div class="split-invoice-meta">
+                            <span>
+                                <small>Archivo</small>
+                                <strong>{{ item.source_file }}</strong>
+                            </span>
+                            <span>
+                                <small>Proveedor</small>
+                                <strong>{{ item.supplier_name }}</strong>
+                            </span>
+                            <span>
+                                <small>Importe a distribuir</small>
+                                <strong>
+                                    {% if item.total is not none %}
+                                        ${{ "{:,.0f}".format(item.total) }}
+                                    {% else %}
+                                        No identificado
+                                    {% endif %}
+                                </strong>
+                            </span>
+                        </div>
+
+                        <div class="split-mode-control" role="radiogroup" aria-label="Tipo de distribución">
+                            <label>
+                                <input type="radio" name="split_mode_{{ idx }}" value="equal" checked data-split-mode>
+                                <span>Reparto equitativo</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="split_mode_{{ idx }}" value="custom" data-split-mode>
+                                <span>Personalizar</span>
+                            </label>
+                        </div>
+
+                        <div class="split-percentage-grid">
+                            {% for part_index in range(item.split_factor) %}
+                                <label class="split-percentage-field">
+                                    <span>Archivo {{ part_index + 1 }}</span>
+                                    <span class="split-percentage-input">
+                                        <input
+                                            type="number"
+                                            name="percentage_{{ idx }}_{{ part_index }}"
+                                            value="{{ item.equal_percentages[part_index] }}"
+                                            data-equal-value="{{ item.equal_percentages[part_index] }}"
+                                            min="0.01"
+                                            max="99.99"
+                                            step="0.01"
+                                            inputmode="decimal"
+                                            readonly
+                                            required
+                                            data-percentage
+                                        >
+                                        <span>%</span>
+                                    </span>
+                                    <small data-allocation-preview>Por calcular</small>
+                                </label>
+                            {% endfor %}
+                        </div>
+
+                        <div class="split-total-row">
+                            <span>Total asignado</span>
+                            <strong data-percentage-total>100%</strong>
+                            <span class="split-total-status is-valid" data-total-status>Distribución completa</span>
+                        </div>
+                    </fieldset>
+                {% endfor %}
+            </div>
+
+            <footer class="split-review-footer">
+                <span>{{ items|length }} factura{% if items|length != 1 %}s{% endif %} por confirmar</span>
+                <button type="submit" class="manual-modal-confirm">Confirmar porcentajes y continuar</button>
+            </footer>
+        </form>
+    </div>
+
+    <script>
+        (() => {
+            const form = document.getElementById("splitReviewForm");
+            const moneyFormatter = new Intl.NumberFormat("es-CO", {
+                style: "currency",
+                currency: "COP",
+                maximumFractionDigits: 0
+            });
+
+            function updateItem(item) {
+                const inputs = [...item.querySelectorAll("[data-percentage]")];
+                const values = inputs.map((input) => Number.parseFloat(input.value) || 0);
+                const totalPercentage = values.reduce((sum, value) => sum + value, 0);
+                const isValid = Math.abs(totalPercentage - 100) < 0.0001 && values.every((value) => value > 0);
+                const totalNode = item.querySelector("[data-percentage-total]");
+                const statusNode = item.querySelector("[data-total-status]");
+                totalNode.textContent = `${totalPercentage.toFixed(2).replace(/\.00$/, "")}%`;
+                statusNode.textContent = isValid ? "Distribución completa" : "Debe sumar 100%";
+                statusNode.classList.toggle("is-valid", isValid);
+                statusNode.classList.toggle("is-invalid", !isValid);
+
+                const invoiceTotal = Number.parseFloat(item.dataset.total);
+                const previews = [...item.querySelectorAll("[data-allocation-preview]")];
+                if (Number.isFinite(invoiceTotal)) {
+                    const allocations = values.map((value) => Math.round(invoiceTotal * value / 100));
+                    allocations[allocations.length - 1] += Math.round(invoiceTotal) - allocations.reduce((sum, value) => sum + value, 0);
+                    previews.forEach((preview, index) => {
+                        preview.textContent = moneyFormatter.format(allocations[index]);
+                    });
+                } else {
+                    previews.forEach((preview) => {
+                        preview.textContent = "Importe no identificado";
+                    });
+                }
+                return isValid;
+            }
+
+            document.querySelectorAll("[data-split-item]").forEach((item) => {
+                const inputs = [...item.querySelectorAll("[data-percentage]")];
+                item.querySelectorAll("[data-split-mode]").forEach((mode) => {
+                    mode.addEventListener("change", () => {
+                        const custom = mode.value === "custom" && mode.checked;
+                        if (!mode.checked) return;
+                        inputs.forEach((input) => {
+                            input.readOnly = !custom;
+                            if (!custom) input.value = input.dataset.equalValue;
+                        });
+                        item.classList.toggle("is-custom", custom);
+                        updateItem(item);
+                        if (custom) inputs[0].focus();
+                    });
+                });
+                inputs.forEach((input) => input.addEventListener("input", () => updateItem(item)));
+                updateItem(item);
+            });
+
+            form.addEventListener("submit", (event) => {
+                const invalidItem = [...document.querySelectorAll("[data-split-item]")]
+                    .find((item) => !updateItem(item));
+                if (invalidItem) {
+                    event.preventDefault();
+                    invalidItem.scrollIntoView({ behavior: "smooth", block: "center" });
+                    invalidItem.querySelector("[data-percentage]:not([readonly])")?.focus();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

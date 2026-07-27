@@ -23,6 +23,7 @@ class NonInvoiceUBLDocument(ValueError):
 class ParsedInvoiceSupport:
     source_file: str
     source_type: str
+    document_type: str
     invoice_id: str | None
     supplier_id: str | None
     supplier_name: str | None
@@ -83,6 +84,7 @@ class InvoiceSupportReader:
         columns = [
             "source_file",
             "source_type",
+            "document_type",
             "invoice_id",
             "supplier_id",
             "supplier_name",
@@ -148,6 +150,7 @@ class InvoiceSupportReader:
         return ParsedInvoiceSupport(
             source_file=path.name,
             source_type="pdf",
+            document_type="Invoice",
             invoice_id=invoice_id,
             supplier_id=None,
             supplier_name=None,
@@ -168,37 +171,38 @@ class InvoiceSupportReader:
         )
 
     def _parse_xml_file(self, path: Path) -> ParsedInvoiceSupport:
-        invoice_root = self._extract_invoice_root_from_xml(path)
-        invoice_id = self._find_text(invoice_root, "./cbc:ID")
-        supplier_id = self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cbc:CompanyID")
+        document_root = self._extract_invoice_root_from_xml(path)
+        document_type = self._local_name(document_root)
+        invoice_id = self._find_text(document_root, "./cbc:ID")
+        supplier_id = self._find_text(document_root, ".//cac:AccountingSupplierParty//cbc:CompanyID")
         supplier_name = (
-            self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cac:PartyName/cbc:Name")
-            or self._find_text(invoice_root, ".//cac:AccountingSupplierParty//cbc:RegistrationName")
+            self._find_text(document_root, ".//cac:AccountingSupplierParty//cac:PartyName/cbc:Name")
+            or self._find_text(document_root, ".//cac:AccountingSupplierParty//cbc:RegistrationName")
         )
-        invoice_date = self._parse_date_value(self._find_text(invoice_root, "./cbc:IssueDate"))
+        invoice_date = self._parse_date_value(self._find_text(document_root, "./cbc:IssueDate"))
         due_date = self._parse_date_value(
-            self._find_text(invoice_root, ".//cac:PaymentMeans/cbc:PaymentDueDate")
-            or self._find_text(invoice_root, "./cbc:DueDate")
+            self._find_text(document_root, ".//cac:PaymentMeans/cbc:PaymentDueDate")
+            or self._find_text(document_root, "./cbc:DueDate")
         )
-        subtotal = round_cop(self._parse_number(self._find_text(invoice_root, ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount")))
-        total = round_cop(self._parse_number(self._find_text(invoice_root, ".//cac:LegalMonetaryTotal/cbc:PayableAmount")))
-        detected_iva = self._resolve_xml_tax_amount(invoice_root, subtotal, total)
+        subtotal = round_cop(self._parse_number(self._find_text(document_root, ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount")))
+        total = round_cop(self._parse_number(self._find_text(document_root, ".//cac:LegalMonetaryTotal/cbc:PayableAmount")))
+        detected_iva = self._resolve_xml_tax_amount(document_root, subtotal, total)
         has_zero_iva_hint = detected_iva == 0
-        withholding_tax = self._extract_xml_withholding_tax(invoice_root)
-        payment_terms_text = self._extract_xml_payment_terms(invoice_root)
-        item_count_hint = self._extract_xml_item_count(invoice_root)
-        line_items = self._extract_xml_line_items(invoice_root)
+        withholding_tax = self._extract_xml_withholding_tax(document_root)
+        payment_terms_text = self._extract_xml_payment_terms(document_root)
+        item_count_hint = self._extract_xml_item_count(document_root)
+        line_items = self._extract_xml_line_items(document_root)
         discounts, unresolved_discount_notes = self._extract_xml_discounts(
-            invoice_root,
+            document_root,
             line_items,
             subtotal,
             invoice_date,
         )
         payable_rounding = self._parse_number(
-            self._find_text(invoice_root, ".//cac:LegalMonetaryTotal/cbc:PayableRoundingAmount")
+            self._find_text(document_root, ".//cac:LegalMonetaryTotal/cbc:PayableRoundingAmount")
         )
         payable_rounding = round_cop(payable_rounding)
-        text_excerpt = self._build_xml_excerpt(invoice_root)
+        text_excerpt = self._build_xml_excerpt(document_root)
 
         flags = []
         if invoice_id is None:
@@ -213,6 +217,7 @@ class InvoiceSupportReader:
         return ParsedInvoiceSupport(
             source_file=path.name,
             source_type="xml",
+            document_type=document_type,
             invoice_id=invoice_id,
             supplier_id=supplier_id,
             supplier_name=supplier_name,
@@ -242,18 +247,25 @@ class InvoiceSupportReader:
 
     def _extract_invoice_root_from_xml(self, path: Path) -> ET.Element:
         root = ET.parse(path).getroot()
-        if root.tag.endswith("Invoice"):
+        root_type = self._local_name(root)
+        if root_type in {"Invoice", "CreditNote"}:
             return root
 
-        description = root.find(f".//{{{self.XML_CBC_NS}}}Description")
-        raw_text = description.text if description is not None and description.text else ""
-        match = re.search(r"(<Invoice[\s\S]*</Invoice>)", raw_text)
-        if not match:
-            document_type = root.tag.rsplit("}", 1)[-1]
-            if document_type == "ApplicationResponse":
-                raise NonInvoiceUBLDocument(path.name, document_type)
-            raise ValueError(f"Could not find embedded Invoice UBL inside {path.name}")
-        return ET.fromstring(match.group(1))
+        for description in root.findall(f".//{{{self.XML_CBC_NS}}}Description"):
+            raw_text = description.text or ""
+            for embedded_type in ("Invoice", "CreditNote"):
+                match = re.search(
+                    rf"(<{embedded_type}\b[\s\S]*</{embedded_type}>)",
+                    raw_text,
+                )
+                if match:
+                    return ET.fromstring(match.group(1))
+
+        if root_type == "ApplicationResponse":
+            raise NonInvoiceUBLDocument(path.name, root_type)
+        raise ValueError(
+            f"Could not find embedded Invoice or CreditNote UBL inside {path.name}"
+        )
 
     def _find_text(self, root: ET.Element, xpath: str) -> str | None:
         value = root.findtext(xpath, default=None, namespaces=self.XML_NS)
@@ -290,7 +302,7 @@ class InvoiceSupportReader:
         if line_extension is None:
             line_amounts = [
                 self._parse_number(self._find_text(line, "./cbc:LineExtensionAmount"))
-                for line in root.findall(".//cac:InvoiceLine", self.XML_NS)
+                for line in self._xml_document_lines(root)
             ]
             valid_line_amounts = [amount for amount in line_amounts if amount is not None]
             if valid_line_amounts:
@@ -365,12 +377,12 @@ class InvoiceSupportReader:
         line_count = self._find_text(root, "./cbc:LineCountNumeric")
         if line_count and line_count.isdigit():
             return int(line_count)
-        lines = root.findall(".//cac:InvoiceLine", self.XML_NS)
+        lines = self._xml_document_lines(root)
         return len(lines) or None
 
     def _extract_xml_line_items(self, root: ET.Element) -> list[dict]:
         items = []
-        for line in root.findall(".//cac:InvoiceLine", self.XML_NS):
+        for line in self._xml_document_lines(root):
             line_id = self._find_text(line, "./cbc:ID")
             description = self._extract_xml_line_description(line)
             net_amount = self._parse_number(self._find_text(line, "./cbc:LineExtensionAmount"))
@@ -383,7 +395,10 @@ class InvoiceSupportReader:
             charge_amount = round_cop(charge_amount, 0)
             tax_amount = self._parse_number(self._find_text(line, ".//cac:TaxTotal/cbc:TaxAmount"))
             tax_amount = round_cop(tax_amount)
-            quantity = self._parse_number(self._find_text(line, "./cbc:InvoicedQuantity"))
+            quantity = self._parse_number(
+                self._find_text(line, "./cbc:InvoicedQuantity")
+                or self._find_text(line, "./cbc:CreditedQuantity")
+            )
             if description is None and amount is None:
                 continue
             items.append(
@@ -419,12 +434,13 @@ class InvoiceSupportReader:
 
             parent = parents.get(allowance)
             scope = self._local_name(parent) if parent is not None else "Invoice"
-            line_id = self._find_text(parent, "./cbc:ID") if scope == "InvoiceLine" else None
-            if scope != "InvoiceLine":
+            is_line_scope = scope in {"InvoiceLine", "CreditNoteLine"}
+            line_id = self._find_text(parent, "./cbc:ID") if is_line_scope else None
+            if not is_line_scope:
                 document_allowance_sum += amount
             discounts.append(
                 {
-                    "source": "xml_line_allowance" if scope == "InvoiceLine" else "xml_allowance",
+                    "source": "xml_line_allowance" if is_line_scope else "xml_allowance",
                     "amount": round_cop(amount, 0),
                     "percentage": self._parse_number(
                         self._find_text(allowance, "./cbc:MultiplierFactorNumeric")
@@ -494,7 +510,10 @@ class InvoiceSupportReader:
                 continue
 
             parent = parents.get(note)
-            while parent is not None and self._local_name(parent) != "InvoiceLine":
+            while parent is not None and self._local_name(parent) not in {
+                "InvoiceLine",
+                "CreditNoteLine",
+            }:
                 parent = parents.get(parent)
             line_id = self._find_text(parent, "./cbc:ID") if parent is not None else None
             parsed = self._discount_from_note(raw_note, line_id, line_items, gross_total, invoice_date)
@@ -740,6 +759,12 @@ class InvoiceSupportReader:
             return None
         return element.tag.rsplit("}", 1)[-1]
 
+    def _xml_document_lines(self, root: ET.Element) -> list[ET.Element]:
+        return (
+            root.findall(".//cac:InvoiceLine", self.XML_NS)
+            + root.findall(".//cac:CreditNoteLine", self.XML_NS)
+        )
+
     def _extract_xml_line_description(self, line: ET.Element) -> str | None:
         description = self._find_text(line, ".//cac:Item/cbc:Description")
         if self._is_useful_xml_description(description):
@@ -778,10 +803,10 @@ class InvoiceSupportReader:
 
     def _build_xml_excerpt(self, root: ET.Element) -> str:
         parts = []
-        for item in root.findall(".//cac:InvoiceLine/cac:Item/cbc:Description", self.XML_NS):
-            text = (item.text or "").strip()
-            if text:
-                parts.append(text)
+        for line in self._xml_document_lines(root):
+            description = self._find_text(line, "./cac:Item/cbc:Description")
+            if description:
+                parts.append(description)
         if not parts:
             for note in root.findall("./cbc:Note", self.XML_NS):
                 text = (note.text or "").strip()

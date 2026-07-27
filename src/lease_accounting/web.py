@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
 from flask import (
     Flask,
@@ -132,6 +133,53 @@ def _load_review_job(batch_id: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _equal_split_percentages(split_factor: int) -> list[str]:
+    if split_factor <= 1:
+        return ["100"]
+    base = (Decimal("100") / Decimal(split_factor)).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_DOWN,
+    )
+    percentages = [base for _ in range(split_factor)]
+    percentages[-1] += Decimal("100") - sum(percentages)
+    return [format(value, "f") for value in percentages]
+
+
+def _build_split_review_items(job: dict) -> list[dict]:
+    reader = InvoiceSupportReader()
+    items = []
+    for support_path, raw_factor in (job.get("support_split_factors") or {}).items():
+        split_factor = max(int(raw_factor or 1), 1)
+        if split_factor <= 1:
+            continue
+        path = Path(support_path)
+        parsed = reader.parse_file(path)
+        total = parsed.total if parsed.total is not None else parsed.subtotal
+        items.append(
+            {
+                "support_path": support_path,
+                "source_file": path.name,
+                "invoice_id": parsed.invoice_id or "Sin numero identificado",
+                "supplier_name": parsed.supplier_name or "Proveedor no identificado",
+                "split_factor": split_factor,
+                "total": total,
+                "equal_percentages": _equal_split_percentages(split_factor),
+            }
+        )
+    return items
+
+
+def _render_split_review(batch_id: str, job: dict):
+    items = _build_split_review_items(job)
+    _save_review_job(batch_id, job)
+    return render_template(
+        "split_review.html",
+        batch_id=batch_id,
+        items=items,
+        manual_processing_files=job.get("manual_processing_files", []),
+    )
+
+
 def _run_pipeline_from_job(job: dict) -> dict:
     pipeline = LeaseAccountingPipeline(output_dir=OUTPUT_DIR, learning_dictionary_path=LEARNING_DICTIONARY_PATH)
     result = pipeline.run(
@@ -143,6 +191,7 @@ def _run_pipeline_from_job(job: dict) -> dict:
         history_path=Path(job["history_path"]) if job.get("history_path") else None,
         support_paths=[Path(path) for path in job.get("support_paths", [])],
         support_split_factors=job.get("support_split_factors") or None,
+        support_split_weights=job.get("support_split_weights") or None,
         macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
@@ -179,6 +228,7 @@ def _prepare_pipeline_from_job(job: dict):
         history_path=Path(job["history_path"]) if job.get("history_path") else None,
         support_paths=[Path(path) for path in job.get("support_paths", [])],
         support_split_factors=job.get("support_split_factors") or None,
+        support_split_weights=job.get("support_split_weights") or None,
         macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
@@ -521,12 +571,15 @@ def process():
             "history_path": str(history_path) if history_path else None,
             "support_paths": [str(path) for path in support_paths],
             "support_split_factors": support_split_factors,
+            "support_split_weights": {},
             "macro_template_path": str(macro_workbook_path) if macro_workbook_path else None,
             "period": period or None,
             "manual_processing_files": manual_processing_files,
             "contract_selections": {},
             "discount_selections": {},
         }
+        if support_split_factors:
+            return _render_split_review(batch_id, job)
         return _continue_processing_job(batch_id, job)
     except PipelineError as exc:
         if "Todas las facturas del lote se marcaron para procesamiento manual" in str(exc):
@@ -537,6 +590,58 @@ def process():
     except Exception as exc:  # pragma: no cover
         flash(f"Unexpected error: {exc}")
         return redirect(url_for("index"))
+
+
+@app.route("/split-review/<batch_id>", methods=["POST"])
+def split_review(batch_id: str):
+    try:
+        job = _load_review_job(batch_id)
+        split_factors = job.get("support_split_factors") or {}
+        item_count = int(request.form.get("item_count", "0"))
+        if item_count != len(split_factors):
+            raise PipelineError("La revision de porcentajes no coincide con las facturas cargadas.")
+
+        split_weights = {}
+        for idx, (support_path, raw_factor) in enumerate(split_factors.items()):
+            split_factor = max(int(raw_factor or 1), 1)
+            percentages = []
+            for part_index in range(split_factor):
+                raw_value = request.form.get(
+                    f"percentage_{idx}_{part_index}",
+                    "",
+                ).strip()
+                try:
+                    percentage = Decimal(raw_value)
+                except (InvalidOperation, ValueError):
+                    raise PipelineError(
+                        f"Escribe porcentajes validos para {Path(support_path).name}."
+                    )
+                if not percentage.is_finite() or percentage <= 0:
+                    raise PipelineError(
+                        f"Cada porcentaje de {Path(support_path).name} debe ser mayor que cero."
+                    )
+                percentages.append(percentage)
+
+            if sum(percentages) != Decimal("100"):
+                raise PipelineError(
+                    f"Los porcentajes de {Path(support_path).name} deben sumar exactamente 100%."
+                )
+            split_weights[support_path] = [format(value, "f") for value in percentages]
+
+        job["support_split_weights"] = split_weights
+        _save_review_job(batch_id, job)
+        return _continue_processing_job(batch_id, job)
+    except PipelineError as exc:
+        flash(str(exc))
+        try:
+            job = _load_review_job(batch_id)
+            return _render_split_review(batch_id, job)
+        except PipelineError:
+            return redirect(url_for("index"))
+    except Exception as exc:  # pragma: no cover
+        flash(f"Unexpected error: {exc}")
+        return redirect(url_for("index"))
+
 
 @app.route("/contract-review/<batch_id>", methods=["POST"])
 def contract_review(batch_id: str):

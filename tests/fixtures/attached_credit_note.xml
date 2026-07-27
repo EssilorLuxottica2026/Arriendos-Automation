@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AttachedDocument
+    xmlns="urn:oasis:names:specification:ubl:schema:xsd:AttachedDocument-2"
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:ID>ATTACHED-FENC17661</cbc:ID>
+    <cbc:Description><![CDATA[
+        <CreditNote
+            xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+            xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+            xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+            <cbc:ID>FENC17661</cbc:ID>
+            <cbc:IssueDate>2026-07-15</cbc:IssueDate>
+            <cbc:LineCountNumeric>1</cbc:LineCountNumeric>
+            <cac:AccountingSupplierParty>
+                <cac:Party>
+                    <cac:PartyName><cbc:Name>TITAN PLAZA</cbc:Name></cac:PartyName>
+                    <cac:PartyTaxScheme><cbc:CompanyID>900534711</cbc:CompanyID></cac:PartyTaxScheme>
+                </cac:Party>
+            </cac:AccountingSupplierParty>
+            <cac:TaxTotal><cbc:TaxAmount currencyID="COP">0.00</cbc:TaxAmount></cac:TaxTotal>
+            <cac:LegalMonetaryTotal>
+                <cbc:LineExtensionAmount currencyID="COP">500.00</cbc:LineExtensionAmount>
+                <cbc:TaxExclusiveAmount currencyID="COP">500.00</cbc:TaxExclusiveAmount>
+                <cbc:TaxInclusiveAmount currencyID="COP">500.00</cbc:TaxInclusiveAmount>
+                <cbc:PayableAmount currencyID="COP">500.00</cbc:PayableAmount>
+            </cac:LegalMonetaryTotal>
+            <cac:CreditNoteLine>
+                <cbc:ID>1</cbc:ID>
+                <cbc:CreditedQuantity unitCode="EA">1</cbc:CreditedQuantity>
+                <cbc:LineExtensionAmount currencyID="COP">500.00</cbc:LineExtensionAmount>
+                <cac:Item><cbc:Description>FONDO DE IMPREVISTOS</cbc:Description></cac:Item>
+            </cac:CreditNoteLine>
+        </CreditNote>
+    ]]></cbc:Description>
+</AttachedDocument>
