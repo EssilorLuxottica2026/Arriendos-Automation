@@ -332,6 +332,7 @@ class LeaseAccountingPipeline:
         self.warnings: list[str] = []
         self.contract_review_items: list[dict] = []
         self.discount_review_items: list[dict] = []
+        self.preflight_processing_issues: list[dict] = []
         self.distribution_rules = pd.DataFrame()
         self.learning_dictionary_path = Path(learning_dictionary_path) if learning_dictionary_path else self.DEFAULT_LEARNING_DICTIONARY
         self.learning_dictionary = pd.DataFrame()
@@ -356,6 +357,7 @@ class LeaseAccountingPipeline:
         self.warnings = []
         self.contract_review_items = []
         self.discount_review_items = []
+        self.preflight_processing_issues = []
         run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M")
         self.output_dir = self.base_output_dir / run_folder_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -400,6 +402,7 @@ class LeaseAccountingPipeline:
         self.warnings = []
         self.contract_review_items = []
         self.discount_review_items = []
+        self.preflight_processing_issues = []
         self.learning_dictionary = self._load_learning_dictionary(self.learning_dictionary_path)
         data = self.load_data(
             invoices_path=invoices_path,
@@ -559,49 +562,57 @@ class LeaseAccountingPipeline:
                 ~invoice_supports["invoice_key"].isin(invoice_keys)
             ]
             if not unmatched_numbers.empty:
-                details = []
-                for _, support in unmatched_numbers.head(10).iterrows():
+                for _, support in unmatched_numbers.iterrows():
                     invoice_id = self._clean_text(support.get("invoice_id")) or "SIN_NUMERO"
                     source_file = self._clean_text(support.get("source_file")) or "archivo adjunto"
-                    details.append(f"{invoice_id} ({source_file})")
-                extra = "" if len(unmatched_numbers) <= 10 else f" y {len(unmatched_numbers) - 10} mas"
-                raise PipelineError(
-                    "Los XML/PDF adjuntos no coinciden con el archivo consolidado de facturas. "
-                    "Revisa que el numero de factura exista en el invoices file: "
-                    + ", ".join(details)
-                    + extra
-                    + "."
+                    self.preflight_processing_issues.append(
+                        {
+                            "invoice_id": invoice_id,
+                            "source_file": source_file,
+                            "store": None,
+                            "location": source_file,
+                            "problem": "El numero de factura no existe en el invoices file; no se genero su CSV",
+                            "issue_type": "invoice_number_mismatch",
+                        }
+                    )
+                self._record_warning(
+                    f"Se omitieron {len(unmatched_numbers)} XML/PDF porque su numero de factura no existe "
+                    "en el invoices file. El resto del lote continuo."
                 )
+                invoice_supports = invoice_supports.drop(index=unmatched_numbers.index).copy()
 
             mismatched_nits = invoice_supports[
                 invoice_supports["invoice_key"].isin(invoice_keys)
                 & ~invoice_supports["invoice_nit_key"].isin(invoice_nit_keys)
             ]
             if not mismatched_nits.empty:
-                details = []
-                for _, support in mismatched_nits.head(10).iterrows():
+                for _, support in mismatched_nits.iterrows():
                     invoice_key = support.get("invoice_key")
-                    expected_nits = sorted(
-                        set(
-                            invoices.loc[invoices["invoice_pdf_key"].eq(invoice_key), "supplier_nit"]
-                            .dropna()
-                            .map(str)
-                            .tolist()
-                        )
+                    matching_rows = invoices.loc[invoices["invoice_pdf_key"].eq(invoice_key)]
+                    expected_nits = sorted(set(matching_rows["supplier_nit"].dropna().map(str).tolist()))
+                    stores = list(dict.fromkeys(matching_rows["store"].dropna().map(str).tolist()))
+                    invoice_id = self._clean_text(support.get("invoice_id")) or "SIN_NUMERO"
+                    source_file = self._clean_text(support.get("source_file")) or "archivo adjunto"
+                    store = ", ".join(stores) or None
+                    self.preflight_processing_issues.append(
+                        {
+                            "invoice_id": invoice_id,
+                            "source_file": source_file,
+                            "store": store,
+                            "location": " / ".join(value for value in [source_file, store] if value),
+                            "problem": (
+                                f"El NIT del XML ({support.get('supplier_nit') or 'VACIO'}) no coincide con "
+                                f"el NIT del invoices file ({', '.join(expected_nits) or 'VACIO'}); "
+                                "no se genero su CSV"
+                            ),
+                            "issue_type": "supplier_nit_mismatch",
+                        }
                     )
-                    details.append(
-                        f"{self._clean_text(support.get('invoice_id')) or 'SIN_NUMERO'}: "
-                        f"XML NIT {support.get('supplier_nit') or 'VACIO'}, "
-                        f"invoices NIT {', '.join(expected_nits) or 'VACIO'} "
-                        f"({self._clean_text(support.get('source_file')) or 'archivo adjunto'})"
-                    )
-                extra = "" if len(mismatched_nits) <= 10 else f" y {len(mismatched_nits) - 10} mas"
-                raise PipelineError(
-                    "El numero de factura existe, pero el NIT del XML no coincide con el NIT del invoices file: "
-                    + "; ".join(details)
-                    + extra
-                    + ". Corrige el XML o la fila del invoices file antes de continuar."
+                self._record_warning(
+                    f"Se omitieron {len(mismatched_nits)} XML/PDF porque su NIT no coincide con el invoices file. "
+                    "El resto del lote continuo."
                 )
+                invoice_supports = invoice_supports.drop(index=mismatched_nits.index).copy()
 
             if table_input:
                 xml_supports = invoice_supports[
@@ -1194,7 +1205,10 @@ class LeaseAccountingPipeline:
             output_rows=len(summary_df),
             header_rows=len(header_export_df),
             validation_rows=len(validation_df),
-            processing_issues=self._build_processing_issues(validation_df),
+            processing_issues=[
+                *self.preflight_processing_issues,
+                *self._build_processing_issues(validation_df),
+            ],
             logs=self.logs.copy(),
             warnings=self.warnings.copy(),
         )

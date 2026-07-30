@@ -192,6 +192,7 @@ class InvoiceSupportReader:
         payment_terms_text = self._extract_xml_payment_terms(document_root)
         item_count_hint = self._extract_xml_item_count(document_root)
         line_items = self._extract_xml_line_items(document_root)
+        line_items.extend(self._extract_xml_document_charges(document_root))
         discounts, unresolved_discount_notes = self._extract_xml_discounts(
             document_root,
             line_items,
@@ -415,6 +416,42 @@ class InvoiceSupportReader:
             )
         return items
 
+    def _extract_xml_document_charges(self, root: ET.Element) -> list[dict]:
+        parents = {child: parent for parent in root.iter() for child in parent}
+        charges = []
+        for index, adjustment in enumerate(
+            root.findall(".//cac:AllowanceCharge", self.XML_NS),
+            start=1,
+        ):
+            parent = parents.get(adjustment)
+            if parent is None or self._local_name(parent) not in {"Invoice", "CreditNote"}:
+                continue
+            indicator = (self._find_text(adjustment, "./cbc:ChargeIndicator") or "").lower()
+            amount = self._parse_number(self._find_text(adjustment, "./cbc:Amount"))
+            if indicator != "true" or amount is None or amount <= 0:
+                continue
+            amount = round_cop(amount, 0)
+            reason = (
+                self._find_text(adjustment, "./cbc:AllowanceChargeReason")
+                or self._find_text(adjustment, "./cbc:AllowanceChargeReasonCode")
+                or "CARGO ADICIONAL"
+            )
+            charge_id = self._find_text(adjustment, "./cbc:ID") or str(index)
+            charges.append(
+                {
+                    "line_id": f"DOCUMENT_CHARGE_{charge_id}",
+                    "description": reason,
+                    "amount": amount,
+                    "net_amount": amount,
+                    "allowance_amount": 0,
+                    "charge_amount": amount,
+                    "tax_amount": 0,
+                    "quantity": 1,
+                    "source": "xml_document_charge",
+                }
+            )
+        return charges
+
     def _extract_xml_discounts(
         self,
         root: ET.Element,
@@ -472,7 +509,9 @@ class InvoiceSupportReader:
 
         unresolved_notes: list[str] = []
         seen_notes: set[str] = set()
-        note_elements = root.findall(".//cbc:Note", self.XML_NS) + root.findall(".//cbc:Description", self.XML_NS)
+        # Item descriptions classify the accounting concept; they must never
+        # create a second discount merely because their text mentions one.
+        note_elements = root.findall(".//cbc:Note", self.XML_NS)
         combined_note_text = " | ".join(
             re.sub(r"\s+", " ", (element.text or "")).strip()
             for element in note_elements
@@ -519,10 +558,22 @@ class InvoiceSupportReader:
             parsed = self._discount_from_note(raw_note, line_id, line_items, gross_total, invoice_date)
             if parsed:
                 discounts.append(parsed)
+            elif self._note_has_unchanged_discounted_total(note_key, gross_total):
+                continue
             elif not discounts or re.search(r"\d+(?:[.,]\d+)?\s*%|\$\s*[0-9]", note_key):
                 unresolved_notes.append(raw_note)
 
         return discounts, unresolved_notes
+
+    def _note_has_unchanged_discounted_total(self, note_key: str, gross_total: float | None) -> bool:
+        if gross_total is None:
+            return False
+        match = re.search(
+            r"(?:TOTAL[^|]{0,40})?PAGAR CON DESCUENTO[^$]{0,80}\$\s*([0-9][0-9.,]+)",
+            note_key,
+        )
+        discounted_total = self._parse_number(match.group(1)) if match else None
+        return discounted_total is not None and abs(discounted_total - gross_total) <= 0.01
 
     def _discount_from_note(
         self,
@@ -583,6 +634,17 @@ class InvoiceSupportReader:
                     gross_total,
                     invoice_date,
                 )
+
+        # A value following "total/pagar con descuento" is the discounted
+        # payable total, not the discount amount itself. If no positive
+        # difference was established above, the note does not declare an
+        # additional discount that can be posted.
+        if re.search(
+            r"(?:TOTAL|PAGAR)[^|]{0,80}(?:CON|APLICANDO) (?:DESCUENTO|INCENTIVO)"
+            r"[^$]{0,80}\$\s*[0-9]",
+            key,
+        ):
+            return None
 
         explicit_amount = re.search(r"DESCUENTO[^$]{0,180}\$\s*([0-9][0-9.,]+)", key)
         if explicit_amount:

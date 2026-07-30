@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice
+    xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:ID>NOTE-DISCOUNT-1</cbc:ID>
+    <cbc:IssueDate>2026-07-01</cbc:IssueDate>
+    <cbc:Note>SI PAGA ANTES DEL 2026-07-16 TIENE DERECHO A UN DESCUENTO DEL 10% $100</cbc:Note>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyName><cbc:Name>VENDOR TEST</cbc:Name></cac:PartyName>
+            <cac:PartyTaxScheme><cbc:CompanyID>900000001</cbc:CompanyID></cac:PartyTaxScheme>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="COP">0</cbc:TaxAmount></cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">1000</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="COP">1000</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="COP">1000</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="COP">1000</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    <cac:InvoiceLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="EA">1</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">1000</cbc:LineExtensionAmount>
+        <cac:Item><cbc:Description>CUOTA DE ADMINISTRACION</cbc:Description></cac:Item>
+    </cac:InvoiceLine>
+</Invoice>

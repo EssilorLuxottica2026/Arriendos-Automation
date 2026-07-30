@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CreditNote
+    xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:ID>FENC17662</cbc:ID>
+    <cbc:IssueDate>2026-07-15</cbc:IssueDate>
+    <cbc:Note>TOTAL A PAGAR CON DESCUENTO HASTA EL 15 DE JULIO $ 121,542.00</cbc:Note>
+    <cbc:Note>TOTAL A PAGAR HASTA EL 15 DE JULIO $ 121,542.00</cbc:Note>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyName><cbc:Name>TITAN PLAZA</cbc:Name></cac:PartyName>
+            <cac:PartyTaxScheme><cbc:CompanyID>900534711</cbc:CompanyID></cac:PartyTaxScheme>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="COP">0</cbc:TaxAmount></cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">121542</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="COP">121542</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="COP">121542</cbc:TaxInclusiveAmount>
+        <cbc:AllowanceTotalAmount currencyID="COP">0</cbc:AllowanceTotalAmount>
+        <cbc:ChargeTotalAmount currencyID="COP">0</cbc:ChargeTotalAmount>
+        <cbc:PayableAmount currencyID="COP">121542</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    <cac:CreditNoteLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:CreditedQuantity unitCode="EA">1</cbc:CreditedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">121542</cbc:LineExtensionAmount>
+        <cac:Item><cbc:Description>DESCUENTO POR PRONTO PAGO C CIAL</cbc:Description></cac:Item>
+    </cac:CreditNoteLine>
+</CreditNote>

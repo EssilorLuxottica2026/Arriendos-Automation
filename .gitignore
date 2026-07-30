@@ -34,6 +34,8 @@ dist/
 *.zip
 *.log
 *.spec
+ArriendosAutomation.spec
+captura_modal_factura_no_procesada.png
 
 # OS noise
 .DS_Store
