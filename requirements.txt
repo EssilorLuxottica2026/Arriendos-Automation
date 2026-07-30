@@ -4,3 +4,6 @@ numpy>=1.26.0
 openpyxl>=3.1.0
 xlrd>=2.0.1
 pypdf>=5.0.0
+holidays>=0.58
+pywebview>=6.2
+pyinstaller==6.19.0

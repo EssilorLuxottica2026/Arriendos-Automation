@@ -32,7 +32,7 @@
                 {% for warning in warnings %}
                     <div class="alert alert-warning" role="status">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
-                        <div><strong>Posible XML incorrecto</strong><span>{{ warning }}</span></div>
+                        <div><strong>Aviso del proceso</strong><span>{{ warning }}</span></div>
                     </div>
                 {% endfor %}
             </div>
@@ -76,7 +76,7 @@
                                     <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 260px;">
                                         <strong>{{ item.description }}</strong>
                                         <div style="color: var(--text-secondary); font-size: .85rem; margin-top: 6px;">
-                                            {{ item.count }} ocurrencia(s), total {{ "%.2f"|format(item.total_amount) }}
+                                            {{ item.count }} ocurrencia(s), total {{ "%.0f"|format(item.total_amount) }}
                                         </div>
                                     </td>
                                     <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 220px;">

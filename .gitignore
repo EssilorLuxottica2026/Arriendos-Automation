@@ -29,8 +29,13 @@ tmp_*.xlsm
 tmp_*.csv
 
 # Common packaged artifacts
+build/
+dist/
 *.zip
 *.log
+*.spec
+ArriendosAutomation.spec
+captura_modal_factura_no_procesada.png
 
 # OS noise
 .DS_Store

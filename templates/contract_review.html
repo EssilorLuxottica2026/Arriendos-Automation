@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Revision de contratos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="contract-review-page modal-open">
+    <main class="page contract-review-background" aria-hidden="true">
+        <nav class="brand-bar">
+            <a class="brand-home" href="{{ url_for('index') }}" aria-label="Ir a la pagina principal">
+                <img src="{{ url_for('static', filename='essilor_logo_dark.png') }}" alt="EssilorLuxottica" class="brand-logo">
+            </a>
+            <div class="brand-copy">
+                <span>EssilorLuxottica</span>
+                <strong>Arriendos Automation</strong>
+            </div>
+        </nav>
+        <section class="panel">
+            <h1>Validacion de contratos</h1>
+            <p class="lede">El lote esta en pausa mientras se resuelven estados contractuales contradictorios.</p>
+        </section>
+    </main>
+
+    <div class="contract-review-modal" role="dialog" aria-modal="true" aria-labelledby="contractReviewTitle">
+        <div class="manual-modal-backdrop"></div>
+        <form action="{{ url_for('contract_review', batch_id=batch_id) }}" method="post" class="contract-review-dialog">
+            <header class="contract-review-header">
+                <div class="manual-modal-icon" aria-hidden="true">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3M5 11h14M6 5h12a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2Z"/></svg>
+                </div>
+                <div>
+                    <p class="manual-modal-eyebrow">Decision requerida</p>
+                    <h2 id="contractReviewTitle">Selecciona el contrato aplicable</h2>
+                    <p>Se encontraron estados que producirian clasificaciones RF y RV diferentes para el mismo CeCo.</p>
+                </div>
+            </header>
+
+            <input type="hidden" name="item_count" value="{{ items|length }}">
+            <div class="contract-conflict-list">
+                {% for item in items %}
+                    {% set idx = loop.index0 %}
+                    <fieldset class="contract-conflict">
+                        <input type="hidden" name="ceco_{{ idx }}" value="{{ item.ceco }}">
+                        <legend>
+                            <strong>CeCo {{ item.ceco }}</strong>
+                            <span>{{ item.stores|join(', ') }}{% if item.invoice_ids %} · Factura {{ item.invoice_ids|join(', ') }}{% endif %}</span>
+                        </legend>
+                        <div class="contract-option-list">
+                            {% for option in item.options %}
+                                <label class="contract-option">
+                                    <input type="radio" name="contract_{{ idx }}" value="{{ option.contract_key }}" required>
+                                    <span class="contract-radio-indicator" aria-hidden="true"></span>
+                                    <span class="contract-option-body">
+                                        <span class="contract-option-topline">
+                                            <strong>Contrato {{ option.contract_id }}</strong>
+                                            <span class="contract-status contract-status-{{ option.classification|lower }}">{{ option.status }} · {{ option.classification }}</span>
+                                        </span>
+                                        <span class="contract-name">{{ option.contract_name }}</span>
+                                        <span class="contract-meta">Termino: {{ option.end_of_term }} · Hoja {{ option.sheet }}, fila {{ option.source_row }}</span>
+                                    </span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </fieldset>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="manual-modal-confirm">Confirmar contratos y continuar</button>
+        </form>
+    </div>
+</body>
+</html>

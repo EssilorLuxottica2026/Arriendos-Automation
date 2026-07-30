@@ -1,0 +1,43 @@
+{% if manual_processing_files %}
+<div class="manual-modal is-open" id="manualProcessingModal" role="dialog" aria-modal="true" aria-labelledby="manualModalTitle" aria-describedby="manualModalDescription">
+    <div class="manual-modal-backdrop"></div>
+    <section class="manual-modal-dialog" tabindex="-1">
+        <div class="manual-modal-icon" aria-hidden="true">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+        </div>
+        <div>
+            <p class="manual-modal-eyebrow">Accion manual requerida</p>
+            <h2 id="manualModalTitle">Estos archivos no son facturas XML</h2>
+            <p id="manualModalDescription" class="manual-modal-copy">
+                Son respuestas o eventos UBL de tipo ApplicationResponse. La app los omitio; las demas facturas XML validas, si las hubo, continuaron normalmente. Busca estos archivos y procesa sus facturas manualmente.
+            </p>
+        </div>
+        <ul class="manual-file-list">
+            {% for file in manual_processing_files %}
+                <li>
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-6-6 6 6m-6-6v6h6"/></svg>
+                    <span>{{ file.filename }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="manual-modal-confirm" id="manualModalConfirm">Entendido, procesare manualmente</button>
+    </section>
+</div>
+<script>
+    (() => {
+        const modal = document.getElementById('manualProcessingModal');
+        const confirmButton = document.getElementById('manualModalConfirm');
+        const dialog = modal?.querySelector('.manual-modal-dialog');
+        if (!modal || !confirmButton) return;
+
+        document.body.classList.add('modal-open');
+        window.setTimeout(() => dialog?.focus(), 0);
+        confirmButton.addEventListener('click', () => {
+            modal.classList.remove('is-open');
+            if (!document.querySelector('.contract-review-modal')) {
+                document.body.classList.remove('modal-open');
+            }
+        });
+    })();
+</script>
+{% endif %}

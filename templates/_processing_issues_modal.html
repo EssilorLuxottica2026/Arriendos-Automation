@@ -1,0 +1,59 @@
+{% if processing_issues %}
+<div class="processing-issues-modal is-open" id="processingIssuesModal" role="dialog" aria-modal="true" aria-labelledby="processingIssuesTitle" aria-describedby="processingIssuesDescription">
+    <div class="manual-modal-backdrop"></div>
+    <section class="processing-issues-dialog" tabindex="-1">
+        <header class="processing-issues-header">
+            <div class="manual-modal-icon" aria-hidden="true">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+            </div>
+            <div>
+                <p class="manual-modal-eyebrow">Revision manual requerida</p>
+                <h2 id="processingIssuesTitle">Facturas procesadas</h2>
+                <p id="processingIssuesDescription">Las siguientes facturas tuvieron un problema y deben revisarse o procesarse manualmente:</p>
+            </div>
+        </header>
+
+        <div class="processing-issues-table-wrap">
+            <table class="processing-issues-table">
+                <thead>
+                    <tr>
+                        <th>Factura</th>
+                        <th>Archivo / Tienda</th>
+                        <th>Problema</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for issue in processing_issues %}
+                        <tr>
+                            <td data-label="Factura"><strong>{{ issue.invoice_id }}</strong></td>
+                            <td data-label="Archivo / Tienda">
+                                {% if issue.source_file %}<span class="issue-source-file">{{ issue.source_file }}</span>{% endif %}
+                                {% if issue.store %}<span class="issue-store">{{ issue.store }}</span>{% endif %}
+                                {% if not issue.source_file and not issue.store %}{{ issue.location }}{% endif %}
+                            </td>
+                            <td data-label="Problema">{{ issue.problem }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" class="manual-modal-confirm" id="processingIssuesConfirm">Entendido, continuar</button>
+    </section>
+</div>
+<script>
+    (() => {
+        const modal = document.getElementById('processingIssuesModal');
+        const confirmButton = document.getElementById('processingIssuesConfirm');
+        const dialog = modal?.querySelector('.processing-issues-dialog');
+        if (!modal || !confirmButton) return;
+
+        document.body.classList.add('modal-open');
+        window.setTimeout(() => dialog?.focus(), 0);
+        confirmButton.addEventListener('click', () => {
+            modal.classList.remove('is-open');
+            document.body.classList.remove('modal-open');
+        });
+    })();
+</script>
+{% endif %}
