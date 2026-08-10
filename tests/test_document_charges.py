@@ -9,7 +9,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class DocumentChargeTests(unittest.TestCase):
-    def test_document_interest_becomes_an_allocated_cost_item(self):
+    def test_document_interest_requires_dictionary_learning(self):
         parsed = InvoiceSupportReader().parse_file(FIXTURES / "invoice_document_interest.xml")
 
         interest = next(item for item in parsed.line_items if item.get("source") == "xml_document_charge")
@@ -22,8 +22,25 @@ class DocumentChargeTests(unittest.TestCase):
             interest,
             {"account": pipeline.FIXED_ACCOUNT, "rent_type": "RF"},
         )
-        self.assertEqual(concept, "INTERES")
-        self.assertEqual(account, "1537210004")
+        self.assertEqual(concept, "SIN CLASIFICAR")
+        self.assertEqual(account, "")
+
+        review_items = pipeline.build_concept_review_items(
+            __import__("pandas").DataFrame(
+                [
+                    {
+                        "invoice_id": parsed.invoice_id,
+                        "store": "T078",
+                        "ceco": "6700",
+                        "account": pipeline.FIXED_ACCOUNT,
+                        "rent_type": "RF",
+                        "invoice_line_items": [interest],
+                    }
+                ]
+            )
+        )
+        self.assertEqual(len(review_items), 1)
+        self.assertEqual(review_items[0]["description"], "Intereses")
 
 
 if __name__ == "__main__":

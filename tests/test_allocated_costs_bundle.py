@@ -113,9 +113,40 @@ class AllocatedCostsBundleTests(unittest.TestCase):
             self.assertEqual([row["Attribuzione$Assignment"] for row in second_rows], ["FACTURA-2"])
             self.assertEqual([row["Imp$Amount"] for row in first_rows], ["125"])
             self.assertEqual([row["Imp$Amount"] for row in first_split_rows], ["125"])
+            self.assertEqual([row["CdC$Cost Center"] for row in first_rows], [""])
+            self.assertEqual([row["CdC$Cost Center"] for row in first_split_rows], [""])
+            self.assertEqual([row["CdC$Cost Center"] for row in second_rows], [""])
             self.assertNotIn("_posting_index", first_rows[0])
             self.assertNotIn("_posting_index", first_split_rows[0])
             self.assertNotIn("_posting_index", second_rows[0])
+
+    def test_lucy_export_keeps_cost_center_blank_and_profit_center_filled(self):
+        pipeline = LeaseAccountingPipeline("scratch")
+        lines_df = pd.DataFrame(
+            [
+                {
+                    "posting_index": 1,
+                    "posting_key": "40",
+                    "amount": 1000,
+                    "tax_code": "V0",
+                    "account": "1537210002",
+                    "ceco": "6001",
+                    "profit_center": "6001",
+                    "text": "08-2026 GC VARIABLE T001 6001",
+                    "reference": "F1",
+                    "store": "T001",
+                }
+            ]
+        )
+
+        export = pipeline._build_macro_lucy_export(
+            pd.DataFrame(),
+            lines_df,
+            pd.DataFrame(),
+        )
+
+        self.assertTrue(export["CdC$Cost Center"].isna().all())
+        self.assertEqual(export.iloc[0]["ProfitCenter$Profit Center"], "6001")
 
 
 if __name__ == "__main__":

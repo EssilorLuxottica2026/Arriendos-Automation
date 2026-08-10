@@ -130,7 +130,10 @@
 
             <footer class="split-review-footer">
                 <span>{{ items|length }} factura{% if items|length != 1 %}s{% endif %} por confirmar</span>
-                <button type="submit" class="manual-modal-confirm">Confirmar porcentajes y continuar</button>
+                <div class="split-review-actions">
+                    <a class="split-review-cancel" href="{{ url_for('index') }}">Cancelar y volver</a>
+                    <button type="submit" class="manual-modal-confirm">Confirmar porcentajes y continuar</button>
+                </div>
             </footer>
         </form>
     </div>

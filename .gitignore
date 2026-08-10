@@ -1,9 +1,36 @@
-# Python cache and bytecode
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
 
-# Local runtime and generated artifacts
+# Local Python environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Packaging and executable builds
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.zip
+
+# Runtime uploads, outputs and backups
 data/output/
 data/uploads/
 data/raw/
@@ -11,9 +38,9 @@ data/normalized_inputs/
 data/standardized_workbooks/
 data/macro_export/
 scratch/
-support/media/
+instance/
 
-# Legacy top-level folders that may still appear in old batches or exports
+# Legacy runtime folders from older versions
 output/
 uploads/
 normalized_inputs/
@@ -21,23 +48,33 @@ standardized_workbooks/
 macro_export/
 PDFs/
 XMLs Arriendos/
+support/media/
 
-# Temporary files used during experiments
+# Local test batches that are not packaged by the application
+data/input/XML 2/
+
+# Temporary, backup and Office lock files
 tmp_*.xlsx
 tmp_*.xls
 tmp_*.xlsm
 tmp_*.csv
-
-# Common packaged artifacts
-build/
-dist/
-*.zip
+~$*
+*.tmp
+*.temp
+*.bak
 *.log
-*.spec
-ArriendosAutomation.spec
-captura_modal_factura_no_procesada.png
 
-# OS noise
+# Generated screenshots kept outside documentation
+captura_*.png
+
+# IDE and local agent settings
+.vscode/
+.idea/
+.agents/
+.codex/
+*.code-workspace
+
+# Operating-system files
 .DS_Store
 Thumbs.db
-data/input/XML 2
+Desktop.ini

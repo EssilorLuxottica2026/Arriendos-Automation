@@ -386,6 +386,15 @@ class InvoiceSupportReader:
         for line in self._xml_document_lines(root):
             line_id = self._find_text(line, "./cbc:ID")
             description = self._extract_xml_line_description(line)
+            item_code = (
+                self._find_text(line, "./cac:Item/cac:StandardItemIdentification/cbc:ID")
+                or self._find_text(line, "./cac:Item/cac:SellersItemIdentification/cbc:ID")
+            )
+            beneficiary_id = self._find_text(
+                line,
+                "./cac:Item/cac:InformationContentProviderParty/cac:PowerOfAttorney/"
+                "cac:AgentParty/cac:PartyIdentification/cbc:ID",
+            )
             net_amount = self._parse_number(self._find_text(line, "./cbc:LineExtensionAmount"))
             allowance_amount, charge_amount = self._extract_allowance_charge_totals(line)
             amount = net_amount
@@ -396,6 +405,13 @@ class InvoiceSupportReader:
             charge_amount = round_cop(charge_amount, 0)
             tax_amount = self._parse_number(self._find_text(line, ".//cac:TaxTotal/cbc:TaxAmount"))
             tax_amount = round_cop(tax_amount)
+            tax_percent = self._parse_number(
+                self._find_text(line, ".//cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent")
+            )
+            tax_scheme_id = self._find_text(
+                line,
+                ".//cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cac:TaxScheme/cbc:ID",
+            )
             quantity = self._parse_number(
                 self._find_text(line, "./cbc:InvoicedQuantity")
                 or self._find_text(line, "./cbc:CreditedQuantity")
@@ -406,11 +422,15 @@ class InvoiceSupportReader:
                 {
                     "line_id": line_id,
                     "description": description,
+                    "item_code": item_code,
+                    "beneficiary_id": beneficiary_id,
                     "amount": amount,
                     "net_amount": net_amount,
                     "allowance_amount": allowance_amount,
                     "charge_amount": charge_amount,
                     "tax_amount": tax_amount,
+                    "tax_percent": tax_percent,
+                    "tax_scheme_id": tax_scheme_id,
                     "quantity": quantity,
                 }
             )
