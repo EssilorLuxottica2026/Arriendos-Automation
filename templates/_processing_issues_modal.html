@@ -8,8 +8,8 @@
             </div>
             <div>
                 <p class="manual-modal-eyebrow">Revision manual requerida</p>
-                <h2 id="processingIssuesTitle">Facturas procesadas</h2>
-                <p id="processingIssuesDescription">Las siguientes facturas tuvieron un problema y deben revisarse o procesarse manualmente:</p>
+                <h2 id="processingIssuesTitle">Facturas omitidas</h2>
+                <p id="processingIssuesDescription">El resto del lote se procesó. Las siguientes facturas no generaron CSV y deben revisarse o procesarse manualmente:</p>
             </div>
         </header>
 
@@ -20,6 +20,7 @@
                         <th>Factura</th>
                         <th>Archivo / Tienda</th>
                         <th>Problema</th>
+                        <th>Posible solución</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -32,13 +33,24 @@
                                 {% if not issue.source_file and not issue.store %}{{ issue.location }}{% endif %}
                             </td>
                             <td data-label="Problema">{{ issue.problem }}</td>
+                            <td data-label="Posible solución">
+                                {{ issue.possible_solution or "Revisa la factura y sus datos en los archivos maestros antes de reprocesarla." }}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <button type="button" class="manual-modal-confirm" id="processingIssuesConfirm">Entendido, continuar</button>
+        <div class="processing-issues-actions">
+            {% if result.omitted_invoices_report %}
+                <a class="button-link processing-issues-export" href="{{ url_for('download', filename=result.omitted_invoices_report) }}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14a2 2 0 0 0 2-2v-2M3 17v2a2 2 0 0 0 2 2"/></svg>
+                    <span>Exportar a Excel</span>
+                </a>
+            {% endif %}
+            <button type="button" class="manual-modal-confirm" id="processingIssuesConfirm">Entendido, continuar</button>
+        </div>
     </section>
 </div>
 <script>

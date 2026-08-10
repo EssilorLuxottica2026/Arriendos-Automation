@@ -559,7 +559,7 @@ body.modal-open {
 
 .processing-issues-dialog {
     position: relative;
-    width: min(960px, 100%);
+    width: min(1180px, 100%);
     max-height: calc(100vh - 48px);
     display: flex;
     flex-direction: column;
@@ -629,11 +629,15 @@ body.modal-open {
 }
 
 .processing-issues-table th:nth-child(1) {
-    width: 17%;
+    width: 13%;
 }
 
 .processing-issues-table th:nth-child(2) {
-    width: 34%;
+    width: 27%;
+}
+
+.processing-issues-table th:nth-child(3) {
+    width: 27%;
 }
 
 .processing-issues-table tbody tr:last-child td {
@@ -657,6 +661,23 @@ body.modal-open {
     margin-top: 4px;
     color: #9eb5d1;
     font-size: 0.84rem;
+}
+
+.processing-issues-actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.processing-issues-actions .processing-issues-export {
+    flex: 0 0 auto;
+    min-height: 46px;
+}
+
+.processing-issues-actions .manual-modal-confirm {
+    width: auto;
+    min-width: 240px;
 }
 
 @keyframes modal-enter {
@@ -844,6 +865,99 @@ body.modal-open {
 
 .discount-review-dialog {
     width: min(820px, 100%);
+}
+
+.beneficiary-review-dialog {
+    width: min(980px, 100%);
+}
+
+.beneficiary-conflict {
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.beneficiary-conflict:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.beneficiary-detection-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(120px, 0.5fr) minmax(220px, 0.8fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.beneficiary-detection-summary > span {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.beneficiary-detection-summary small {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+}
+
+.beneficiary-detection-summary strong {
+    overflow-wrap: anywhere;
+}
+
+.beneficiary-total strong {
+    color: #f2cf89;
+    font-size: 1.08rem;
+}
+
+.beneficiary-lines-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+}
+
+.beneficiary-lines-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.beneficiary-lines-table th,
+.beneficiary-lines-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    text-align: left;
+}
+
+.beneficiary-lines-table th {
+    color: #b9c7d9;
+    background: #152134;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+}
+
+.beneficiary-lines-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.beneficiary-review-hint {
+    margin: 10px 0 12px;
+    padding: 10px 12px;
+    border-left: 3px solid #d49d42;
+    color: #d8c49a;
+    background: rgba(194, 139, 47, 0.07);
+    line-height: 1.5;
+}
+
+.beneficiary-review-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.beneficiary-review-footer .manual-modal-confirm {
+    width: auto;
 }
 
 .split-review-dialog {
@@ -1102,6 +1216,39 @@ body.modal-open {
     font-size: 0.82rem;
 }
 
+.split-review-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.split-review-cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 11px 16px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text-secondary);
+    background: #0d1725;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.split-review-cancel:hover {
+    color: var(--text-primary);
+    border-color: #51647d;
+    background: #162235;
+}
+
+.split-review-cancel:focus-visible {
+    outline: 3px solid rgba(121, 167, 230, 0.35);
+    outline-offset: 3px;
+}
+
 .split-review-footer .manual-modal-confirm {
     width: auto;
     margin: 0;
@@ -1282,6 +1429,16 @@ body.modal-open {
         text-transform: uppercase;
     }
 
+    .processing-issues-actions {
+        display: grid;
+    }
+
+    .processing-issues-actions .manual-modal-confirm,
+    .processing-issues-actions .processing-issues-export {
+        width: 100%;
+        min-width: 0;
+    }
+
     .contract-review-modal {
         padding: 12px;
     }
@@ -1297,6 +1454,19 @@ body.modal-open {
 
     .discount-action-list {
         grid-template-columns: 1fr;
+    }
+
+    .beneficiary-detection-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .beneficiary-review-footer {
+        display: grid;
+    }
+
+    .beneficiary-review-footer .manual-modal-confirm,
+    .beneficiary-review-footer .split-review-cancel {
+        width: 100%;
     }
 
     .discount-action {
@@ -1319,6 +1489,15 @@ body.modal-open {
     }
 
     .split-review-footer .manual-modal-confirm {
+        width: 100%;
+    }
+
+    .split-review-actions {
+        display: grid;
+        width: 100%;
+    }
+
+    .split-review-cancel {
         width: 100%;
     }
 }

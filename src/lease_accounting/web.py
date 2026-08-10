@@ -16,7 +16,9 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from .pipeline.pdf_reader import InvoiceSupportReader, NonInvoiceUBLDocument
 from .pipeline.processor import LeaseAccountingPipeline, PipelineError, normalize_learning_phrase
@@ -196,6 +198,7 @@ def _run_pipeline_from_job(job: dict) -> dict:
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
         discount_selections=job.get("discount_selections") or None,
+        beneficiary_selections=job.get("beneficiary_selections") or None,
     )
     manual_processing_files = job.get("manual_processing_files", [])
     result["manual_processing_files"] = manual_processing_files
@@ -210,11 +213,148 @@ def _run_pipeline_from_job(job: dict) -> dict:
                 f"Es un documento UBL {item.get('document_type') or 'no identificado'}, "
                 "no una factura XML. Debe procesarse manualmente."
             ),
+            "possible_solution": (
+                "Solicita al proveedor el XML de la factura o nota de credito correspondiente, "
+                "o procesa este documento manualmente."
+            ),
             "issue_type": "non_invoice_ubl",
         }
         for item in manual_processing_files
     )
+    _write_processing_issues_report(result)
     return result
+
+
+def _safe_excel_text(value) -> str:
+    text = str(value or "").strip()
+    if text.startswith(("=", "+", "-", "@")):
+        return f"'{text}"
+    return text
+
+
+def _write_processing_issues_report(result: dict) -> None:
+    issues = result.get("processing_issues") or []
+    result["omitted_invoices_report"] = None
+    if not issues:
+        return
+
+    try:
+        output_reference = Path(result.get("output_csv") or "")
+        run_folder = Path(result.get("run_folder") or output_reference.parent)
+        if str(run_folder) in {"", "."}:
+            raise ValueError("No se pudo identificar la carpeta de resultados del lote.")
+
+        report_name = "facturas_omitidas.xlsx"
+        report_dir = OUTPUT_DIR / run_folder
+        report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = report_dir / report_name
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Facturas omitidas"
+        headers = ["Factura", "Archivo", "Tienda", "Razon", "Posible solucion"]
+        sheet.append(headers)
+        for issue in issues:
+            sheet.append(
+                [
+                    _safe_excel_text(issue.get("invoice_id") or "Sin numero"),
+                    _safe_excel_text(issue.get("source_file") or ""),
+                    _safe_excel_text(issue.get("store") or ""),
+                    _safe_excel_text(issue.get("problem") or "Requiere revision manual"),
+                    _safe_excel_text(
+                        issue.get("possible_solution")
+                        or "Revisa la factura y sus datos en los archivos maestros antes de reprocesarla."
+                    ),
+                ]
+            )
+
+        header_fill = PatternFill("solid", fgColor="152134")
+        header_font = Font(color="FFFFFF", bold=True)
+        for cell in sheet[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(vertical="center")
+
+        widths = [18, 42, 16, 62, 70]
+        for column_index, width in enumerate(widths, start=1):
+            sheet.column_dimensions[get_column_letter(column_index)].width = width
+        for row in sheet.iter_rows(min_row=2):
+            for cell in row:
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+        sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = f"A1:E{sheet.max_row}"
+        sheet.row_dimensions[1].height = 24
+        workbook.save(report_path)
+        result["omitted_invoices_report"] = f"{run_folder.as_posix()}/{report_name}"
+    except Exception as exc:
+        result.setdefault("warnings", []).append(
+            f"No se pudo generar el Excel de facturas omitidas: {exc}"
+        )
+
+
+def _render_all_beneficiary_invoices_skipped(job: dict, review_items: list[dict]):
+    issues = []
+    selections = job.get("beneficiary_selections") or {}
+    for item in review_items:
+        if selections.get(item.get("review_key")) != "skip":
+            continue
+        total = item.get("items_total") or 0
+        issues.append(
+            {
+                "invoice_id": item.get("invoice_id") or "Sin numero",
+                "source_file": item.get("source_file"),
+                "store": item.get("store"),
+                "location": f"{item.get('source_file') or ''} / {item.get('store') or ''}",
+                "problem": (
+                    f"El XML contiene {item.get('line_count') or 0} lineas iguales asignadas a "
+                    f"beneficiarios diferentes por un total de {total}; la factura fue omitida "
+                    "por decision del usuario"
+                ),
+                "possible_solution": (
+                    f"Revisa en el PDF si el concepto aparece como una sola linea por {total}. "
+                    "Luego vuelve a procesar y elige consolidar o continuar normalmente."
+                ),
+                "issue_type": "beneficiary_distribution_skipped",
+            }
+        )
+
+    for item in job.get("manual_processing_files", []):
+        issues.append(
+            {
+                "invoice_id": "No identificada",
+                "source_file": item.get("filename"),
+                "store": None,
+                "location": item.get("filename") or "Archivo UBL sin nombre",
+                "problem": (
+                    f"Es un documento UBL {item.get('document_type') or 'no identificado'}, "
+                    "no una factura XML. Debe procesarse manualmente."
+                ),
+                "possible_solution": (
+                    "Solicita al proveedor el XML de la factura o nota de credito correspondiente, "
+                    "o procesa este documento manualmente."
+                ),
+                "issue_type": "non_invoice_ubl",
+            }
+        )
+
+    run_folder = datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+    result = {
+        "run_folder": run_folder,
+        "output_csv": None,
+        "invoice_csv_bundle": None,
+        "manual_style_csv_bundle": None,
+        "output_rows": 0,
+        "header_rows": 0,
+        "validation_rows": len(issues),
+        "warnings": [
+            "Todas las facturas procesables del lote fueron omitidas por decision del usuario."
+        ],
+        "logs": ["Proceso completado sin generar CSV: todas las facturas fueron omitidas."],
+        "processing_issues": issues,
+    }
+    _write_processing_issues_report(result)
+    return render_template("result.html", result=result)
 
 
 def _prepare_pipeline_from_job(job: dict):
@@ -233,6 +373,7 @@ def _prepare_pipeline_from_job(job: dict):
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
         discount_selections=job.get("discount_selections") or None,
+        beneficiary_selections=job.get("beneficiary_selections") or None,
     )
     return pipeline, data, output_df, validation_df
 
@@ -240,6 +381,17 @@ def _prepare_pipeline_from_job(job: dict):
 def _continue_processing_job(batch_id: str, job: dict):
     pipeline, _, output_df, _ = _prepare_pipeline_from_job(job)
     manual_processing_files = job.get("manual_processing_files", [])
+    if pipeline.beneficiary_review_items:
+        job["beneficiary_review_context"] = pipeline.beneficiary_review_items
+        _save_review_job(batch_id, job)
+        return render_template(
+            "beneficiary_review.html",
+            batch_id=batch_id,
+            items=pipeline.beneficiary_review_items,
+            warnings=pipeline.warnings,
+            manual_processing_files=manual_processing_files,
+        )
+
     if pipeline.discount_review_items:
         _save_review_job(batch_id, job)
         return render_template(
@@ -577,6 +729,7 @@ def process():
             "manual_processing_files": manual_processing_files,
             "contract_selections": {},
             "discount_selections": {},
+            "beneficiary_selections": {},
         }
         if support_split_factors:
             return _render_split_review(batch_id, job)
@@ -638,6 +791,39 @@ def split_review(batch_id: str):
             return _render_split_review(batch_id, job)
         except PipelineError:
             return redirect(url_for("index"))
+    except Exception as exc:  # pragma: no cover
+        flash(f"Unexpected error: {exc}")
+        return redirect(url_for("index"))
+
+
+@app.route("/beneficiary-review/<batch_id>", methods=["POST"])
+def beneficiary_review(batch_id: str):
+    expected_items = []
+    try:
+        job = _load_review_job(batch_id)
+        item_count = int(request.form.get("item_count", "0"))
+        expected_items = job.get("beneficiary_review_context") or []
+        if item_count != len(expected_items):
+            raise PipelineError("La revision de beneficiarios no coincide con las facturas cargadas.")
+
+        selections = dict(job.get("beneficiary_selections") or {})
+        valid_actions = {"keep", "consolidate", "skip"}
+        for idx in range(item_count):
+            review_key = request.form.get(f"review_key_{idx}", "").strip()
+            action = request.form.get(f"beneficiary_action_{idx}", "").strip().lower()
+            if not review_key or action not in valid_actions:
+                raise PipelineError("Selecciona una accion para cada distribucion por beneficiarios.")
+            selections[review_key] = action
+
+        job["beneficiary_selections"] = selections
+        _save_review_job(batch_id, job)
+        return _continue_processing_job(batch_id, job)
+    except PipelineError as exc:
+        if "Todas las facturas del lote se marcaron para procesamiento manual" in str(exc):
+            return _render_all_beneficiary_invoices_skipped(job, expected_items)
+        else:
+            flash(str(exc))
+        return redirect(url_for("index"))
     except Exception as exc:  # pragma: no cover
         flash(f"Unexpected error: {exc}")
         return redirect(url_for("index"))

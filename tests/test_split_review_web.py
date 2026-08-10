@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from lease_accounting.web import app
+from lease_accounting.web import _render_split_review, app
 
 
 class SplitReviewWebTests(unittest.TestCase):
@@ -58,6 +58,26 @@ class SplitReviewWebTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), "REVIEW_AGAIN")
+
+    def test_review_page_has_cancel_and_return_action(self):
+        item = {
+            "support_path": "C:/uploads/FACTURA-1.xml",
+            "source_file": "FACTURA-1.xml",
+            "invoice_id": "FE1",
+            "supplier_name": "PROVEEDOR",
+            "split_factor": 2,
+            "total": 100,
+            "equal_percentages": ["50.00", "50.00"],
+        }
+        with (
+            app.test_request_context(),
+            patch("lease_accounting.web._build_split_review_items", return_value=[item]),
+            patch("lease_accounting.web._save_review_job"),
+        ):
+            response = _render_split_review("test-batch", dict(self.job))
+
+        self.assertIn('href="/"', response)
+        self.assertIn("Cancelar y volver", response)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>BEN-1</cbc:ID>
+  <cbc:IssueDate>2026-08-03</cbc:IssueDate>
+  <cac:AccountingSupplierParty>
+    <cac:Party><cac:PartyTaxScheme><cbc:CompanyID>816003192</cbc:CompanyID></cac:PartyTaxScheme></cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="COP">300</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="COP">300</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="COP">357</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="COP">357</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:TaxTotal><cbc:TaxAmount currencyID="COP">57</cbc:TaxAmount></cac:TaxTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID><cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="COP">100</cbc:LineExtensionAmount>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="COP">19</cbc:TaxAmount><cac:TaxSubtotal><cac:TaxCategory><cbc:Percent>19</cbc:Percent><cac:TaxScheme><cbc:ID>01</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+    <cac:Item><cbc:Description>CANON AGOSTO</cbc:Description><cac:StandardItemIdentification><cbc:ID>CANON</cbc:ID></cac:StandardItemIdentification><cac:InformationContentProviderParty><cac:PowerOfAttorney><cac:AgentParty><cac:PartyIdentification><cbc:ID>111</cbc:ID></cac:PartyIdentification></cac:AgentParty></cac:PowerOfAttorney></cac:InformationContentProviderParty></cac:Item>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>2</cbc:ID><cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="COP">100</cbc:LineExtensionAmount>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="COP">19</cbc:TaxAmount><cac:TaxSubtotal><cac:TaxCategory><cbc:Percent>19</cbc:Percent><cac:TaxScheme><cbc:ID>01</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+    <cac:Item><cbc:Description>CANON AGOSTO</cbc:Description><cac:StandardItemIdentification><cbc:ID>CANON</cbc:ID></cac:StandardItemIdentification><cac:InformationContentProviderParty><cac:PowerOfAttorney><cac:AgentParty><cac:PartyIdentification><cbc:ID>222</cbc:ID></cac:PartyIdentification></cac:AgentParty></cac:PowerOfAttorney></cac:InformationContentProviderParty></cac:Item>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>3</cbc:ID><cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="COP">100</cbc:LineExtensionAmount>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="COP">19</cbc:TaxAmount><cac:TaxSubtotal><cac:TaxCategory><cbc:Percent>19</cbc:Percent><cac:TaxScheme><cbc:ID>01</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+    <cac:Item><cbc:Description>CANON AGOSTO</cbc:Description><cac:StandardItemIdentification><cbc:ID>CANON</cbc:ID></cac:StandardItemIdentification><cac:InformationContentProviderParty><cac:PowerOfAttorney><cac:AgentParty><cac:PartyIdentification><cbc:ID>333</cbc:ID></cac:PartyIdentification></cac:AgentParty></cac:PowerOfAttorney></cac:InformationContentProviderParty></cac:Item>
+  </cac:InvoiceLine>
+</Invoice>
