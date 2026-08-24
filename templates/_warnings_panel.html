@@ -1,0 +1,160 @@
+{% if process_warnings %}
+<section class="process-warning-summary" aria-labelledby="processWarningsSummaryTitle">
+    <div class="process-warning-summary-icon" aria-hidden="true">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+    </div>
+    <div class="process-warning-summary-copy">
+        <strong id="processWarningsSummaryTitle">
+            {{ process_warnings|length }} {{ "aviso requiere" if process_warnings|length == 1 else "avisos requieren" }} revisión
+        </strong>
+        <span>El lote continuó. Revisa los avisos por categoría antes de cerrar el proceso.</span>
+    </div>
+    <button type="button" class="process-warning-open" id="processWarningsOpen" aria-haspopup="dialog" aria-controls="processWarningsDrawer">
+        <span>Revisar avisos</span>
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6"/></svg>
+    </button>
+</section>
+
+<div class="process-warning-drawer-shell" id="processWarningsDrawer" aria-hidden="true">
+    <button type="button" class="process-warning-backdrop" aria-label="Cerrar avisos" data-warning-close></button>
+    <aside class="process-warning-drawer" role="dialog" aria-modal="true" aria-labelledby="processWarningsTitle" tabindex="-1">
+        <header class="process-warning-drawer-header">
+            <div>
+                <p class="process-warning-eyebrow">Resultado del procesamiento</p>
+                <h2 id="processWarningsTitle">Avisos del proceso</h2>
+                <p>{{ process_warnings|length }} {{ "aviso detectado" if process_warnings|length == 1 else "avisos detectados" }}</p>
+            </div>
+            <button type="button" class="process-warning-close" aria-label="Cerrar avisos" title="Cerrar" data-warning-close>
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+        </header>
+
+        <label class="process-warning-search">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m20 20-4-4"/></svg>
+            <span class="sr-only">Buscar en los avisos</span>
+            <input type="search" id="processWarningsSearch" placeholder="Buscar factura, CECO, NIT o mensaje" autocomplete="off">
+        </label>
+
+        <div class="process-warning-results" aria-live="polite">
+            <span id="processWarningsVisibleCount">{{ process_warnings|length }}</span> de {{ process_warnings|length }} avisos
+        </div>
+
+        <div class="process-warning-groups" id="processWarningGroups"></div>
+        <div class="process-warning-empty" id="processWarningsEmpty" hidden>No hay avisos que coincidan con la búsqueda.</div>
+
+        <div class="process-warning-source" id="processWarningSource" hidden>
+            {% for warning in process_warnings %}
+                <article class="process-warning-item" data-warning-text="{{ warning }}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+                    <p>{{ warning }}</p>
+                </article>
+            {% endfor %}
+        </div>
+
+        <footer class="process-warning-drawer-footer">
+            <button type="button" class="manual-modal-confirm" data-warning-close>Listo, continuar</button>
+        </footer>
+    </aside>
+</div>
+
+<script>
+    (() => {
+        const shell = document.getElementById('processWarningsDrawer');
+        const openButton = document.getElementById('processWarningsOpen');
+        const drawer = shell?.querySelector('.process-warning-drawer');
+        const search = document.getElementById('processWarningsSearch');
+        const source = document.getElementById('processWarningSource');
+        const groupsRoot = document.getElementById('processWarningGroups');
+        const visibleCount = document.getElementById('processWarningsVisibleCount');
+        const emptyState = document.getElementById('processWarningsEmpty');
+        if (!shell || !openButton || !drawer || !search || !source || !groupsRoot) return;
+
+        const normalize = (value) => String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+
+        document.body.appendChild(shell);
+
+        const categories = [
+            { name: 'Duplicidades', pattern: /DUPLIC/ },
+            { name: 'Descuentos e incentivos', pattern: /DESCUENTO|INCENTIVO|PRONTO PAGO|PAGO ESTIMADO/ },
+            { name: 'NIT y proveedores', pattern: /\bNIT\b|PROVEEDOR|VENDOR/ },
+            { name: 'Contratos y CECO', pattern: /CONTRATO|\bCECO\b|REEMPLAZO|VIGENTE|CESADO|CERRADA/ },
+            { name: 'IVA y prorrateo', pattern: /\bIVA\b|PRORRATEO|\bVW\b|\bVQ\b/ },
+            { name: 'Facturas omitidas', pattern: /NO GENERARON CSV|SIN XML|NO TIENEN XML|OMITIERON \d+ FACTURAS|FACTURAS? OMITID/ },
+            { name: 'Archivos y tiendas', pattern: /ARCHIVO|XML|UBL|TIENDA|NOMBRE/ },
+        ];
+
+        const groupedItems = new Map();
+        categories.forEach(({ name }) => groupedItems.set(name, []));
+        groupedItems.set('Otros avisos', []);
+
+        [...source.querySelectorAll('.process-warning-item')].forEach((item) => {
+            const text = normalize(item.dataset.warningText || item.textContent);
+            const category = categories.find(({ pattern }) => pattern.test(text))?.name || 'Otros avisos';
+            item.dataset.warningSearch = text;
+            groupedItems.get(category).push(item);
+        });
+
+        let firstGroup = true;
+        groupedItems.forEach((items, category) => {
+            if (!items.length) return;
+            const details = document.createElement('details');
+            details.className = 'process-warning-group';
+            details.dataset.warningGroup = category;
+            details.open = firstGroup;
+            firstGroup = false;
+
+            const summary = document.createElement('summary');
+            summary.innerHTML = `<span>${category}</span><span class="process-warning-group-count">${items.length}</span>`;
+            const body = document.createElement('div');
+            body.className = 'process-warning-group-body';
+            items.forEach((item) => body.appendChild(item));
+            details.append(summary, body);
+            groupsRoot.appendChild(details);
+        });
+
+        const filterWarnings = () => {
+            const query = normalize(search.value.trim());
+            let count = 0;
+            groupsRoot.querySelectorAll('.process-warning-group').forEach((group) => {
+                let groupCount = 0;
+                group.querySelectorAll('.process-warning-item').forEach((item) => {
+                    const matches = !query || item.dataset.warningSearch.includes(query);
+                    item.hidden = !matches;
+                    if (matches) groupCount += 1;
+                });
+                group.hidden = groupCount === 0;
+                const badge = group.querySelector('.process-warning-group-count');
+                if (badge) badge.textContent = groupCount;
+                if (query && groupCount) group.open = true;
+                count += groupCount;
+            });
+            visibleCount.textContent = count;
+            emptyState.hidden = count !== 0;
+        };
+
+        const closeDrawer = () => {
+            shell.classList.remove('is-open');
+            shell.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('warning-drawer-open');
+            openButton.focus();
+        };
+
+        const openDrawer = () => {
+            shell.classList.add('is-open');
+            shell.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('warning-drawer-open');
+            window.setTimeout(() => drawer.focus(), 0);
+        };
+
+        openButton.addEventListener('click', openDrawer);
+        shell.querySelectorAll('[data-warning-close]').forEach((button) => button.addEventListener('click', closeDrawer));
+        search.addEventListener('input', filterWarnings);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && shell.classList.contains('is-open')) closeDrawer();
+        });
+    })();
+</script>
+{% endif %}
