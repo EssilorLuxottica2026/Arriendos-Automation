@@ -79,6 +79,7 @@ class PipelineResult:
 class LeaseAccountingPipeline:
     FIXED_ACCOUNT = "1245150017"
     VARIABLE_ACCOUNT = "1537210004"
+    SELL_CAM_VARIABLE_ACCOUNT = "1537210002"
     VAT_ACCOUNT = "1149120011"
     TEXT_MAX_LENGTH = 50
     PAYMENT_TERMS_DEFAULT = "0001"
@@ -777,6 +778,7 @@ class LeaseAccountingPipeline:
         contracts["end_of_term"] = pd.to_datetime(contracts["end_of_term"], errors="coerce")
         contracts["rent_min"] = pd.to_numeric(contracts["rent_min"], errors="coerce").fillna(0)
         contracts["sell_media"] = pd.to_numeric(contracts["sell_media"], errors="coerce").fillna(0)
+        contracts["sell_cam"] = pd.to_numeric(contracts["sell_cam"], errors="coerce").fillna(0)
 
         prorateo = cleaned["prorateo"]
         if "vendor_code" not in prorateo.columns:
@@ -989,7 +991,7 @@ class LeaseAccountingPipeline:
         )
 
         merged = merged.merge(
-            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "status_en_rem"]],
+            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "sell_cam", "status_en_rem"]],
             left_on="mapped_ceco_key",
             right_on="ceco_key",
             how="left",
@@ -1125,6 +1127,7 @@ class LeaseAccountingPipeline:
                 "concept",
                 "rent_type",
                 "sell_media",
+                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -1542,6 +1545,7 @@ class LeaseAccountingPipeline:
                         "end_of_term": ["end_of_term", "end_of_term_en_virtual_contract"],
                         "rent_min": ["rent_min_rent", "rent_min"],
                         "sell_media": ["sell_media"],
+                        "sell_cam": ["sell_cam", "administracion_sell_cam"],
                         "status_en_rem": ["status_en_rem"],
                     },
                 )
@@ -1562,6 +1566,7 @@ class LeaseAccountingPipeline:
                 "end_of_term",
                 "rent_min",
                 "sell_media",
+                "sell_cam",
                 "status_en_rem",
                 "country_sheet",
                 "source_row",
@@ -2842,6 +2847,20 @@ class LeaseAccountingPipeline:
                 ]
             line_rows.extend(expense_rows)
 
+            sell_cam_account, sell_cam_text, sell_cam_amount = self._sell_cam_line_payload(row)
+            line_rows.append(
+                {
+                    **base,
+                    "line_type": "sell_cam",
+                    "posting_key": "40",
+                    "account": sell_cam_account,
+                    "concept": "ADMINISTRACION SELL CAM",
+                    "tax_code": self._expense_tax_code(row),
+                    "amount": round_cop(sell_cam_amount, 0),
+                    "text": sell_cam_text,
+                }
+            )
+
             posting_discount_total = pd.to_numeric(
                 pd.Series([row.get("posting_discount_total")]),
                 errors="coerce",
@@ -3960,6 +3979,36 @@ class LeaseAccountingPipeline:
         if not status:
             return False
         return status in {"VIGENTE", "POR VENCER"}
+
+    def _has_sell_cam_amount(self, value) -> bool:
+        if value is None:
+            return False
+
+        if isinstance(value, (int, float)) and not pd.isna(value):
+            return float(value) != 0
+
+        text = self._clean_text(value)
+        if not text:
+            return False
+
+        cleaned = re.sub(r"[^0-9,.\-]", "", text).replace(",", ".")
+        if cleaned in {"", ".", "-", "-.", "--"}:
+            return False
+
+        try:
+            return float(cleaned) != 0
+        except ValueError:
+            return False
+
+    def _sell_cam_line_payload(self, row) -> tuple[str, str, float]:
+        has_amount = self._has_sell_cam_amount(row.get("sell_cam"))
+        amount = pd.to_numeric(pd.Series([row.get("sell_cam")]), errors="coerce").iloc[0]
+        if pd.isna(amount):
+            amount = 0.0
+
+        account = self.FIXED_ACCOUNT if has_amount else self.SELL_CAM_VARIABLE_ACCOUNT
+        text = "Administracion fijo" if has_amount else "Administracion variado"
+        return account, text, float(amount)
 
     def _is_blocked_contract_status(self, value) -> bool:
         status = self._concept_key(value)
