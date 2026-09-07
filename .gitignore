@@ -39,6 +39,7 @@ data/normalized_inputs/
 data/standardized_workbooks/
 data/macro_export/
 scratch/
+tmp_output/
 instance/
 
 # Legacy runtime folders from older versions
