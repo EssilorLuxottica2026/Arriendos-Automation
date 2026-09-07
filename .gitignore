@@ -31,6 +31,7 @@ pip-wheel-metadata/
 *.zip
 
 # Runtime uploads, outputs and backups
+data/input/
 data/output/
 data/uploads/
 data/raw/
@@ -38,6 +39,7 @@ data/normalized_inputs/
 data/standardized_workbooks/
 data/macro_export/
 scratch/
+tmp_output/
 instance/
 
 # Legacy runtime folders from older versions
