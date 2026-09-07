@@ -17,7 +17,6 @@ from werkzeug.serving import make_server
 from lease_accounting.runtime import (
     DICTIONARY_FILENAME,
     LEARNING_DICTIONARY_PATH,
-    PACKAGED_MASTER_FILENAMES,
     RESOURCE_DIR,
     cleanup_runtime,
 )
@@ -56,11 +55,6 @@ def _validate_runtime() -> list[str]:
         if not (RESOURCE_DIR / relative_path).exists():
             errors.append(f"Falta un recurso interno de la aplicacion: {relative_path}")
 
-    packaged_input = RESOURCE_DIR / "data" / "input"
-    required_masters = PACKAGED_MASTER_FILENAMES[:4]
-    for filename in required_masters:
-        if not (packaged_input / filename).exists():
-            errors.append(f"Falta el archivo maestro interno: {filename}")
     return errors
 
 

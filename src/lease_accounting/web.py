@@ -63,6 +63,37 @@ MASTER_FILENAMES = {
     "history_file": "FACTURAS_CONTABILIZADAS.xlsx",
     "macro_workbook_file": "Arriendos_Macro.xlsm"
 }
+REQUIRED_MASTER_KEYS = (
+    "control_file",
+    "contracts_file",
+    "prorateo_file",
+    "distribution_file",
+)
+
+
+def _master_status() -> list[dict[str, str | bool]]:
+    """Describe the locally saved databases; none are needed just to open the app."""
+    return [
+        {
+            "key": key,
+            "filename": filename,
+            "available": (INPUT_DIR / filename).exists(),
+            "required": key in REQUIRED_MASTER_KEYS,
+        }
+        for key, filename in MASTER_FILENAMES.items()
+    ]
+
+
+def _missing_required_masters(files) -> list[str]:
+    """An upload satisfies the requirement even before it is saved locally."""
+    return [
+        MASTER_FILENAMES[key]
+        for key in REQUIRED_MASTER_KEYS
+        if not (
+            (files.get(key) and files.get(key).filename)
+            or (INPUT_DIR / MASTER_FILENAMES[key]).exists()
+        )
+    ]
 
 
 def _allowed(filename: str, allowed_extensions: set[str] | None = None) -> bool:
@@ -513,7 +544,7 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html")
+    return render_template("index.html", master_status=_master_status())
 
 
 def _dictionary_sheet(workbook):
@@ -663,6 +694,15 @@ def process():
     invoices_file = request.files.get("invoices_file")
     if not invoices_file or not invoices_file.filename:
         flash("Por favor, sube el archivo de facturas consolidado (Invoices file).")
+        return redirect(url_for("index"))
+
+    missing_masters = _missing_required_masters(request.files)
+    if missing_masters:
+        flash(
+            "Para procesar el archivo del mes, sube por primera vez en la sección 2 las bases requeridas: "
+            + ", ".join(missing_masters)
+            + "."
+        )
         return redirect(url_for("index"))
 
     batch_id = uuid4().hex
