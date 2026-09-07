@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -8,13 +10,26 @@ from lease_accounting.pipeline.processor import LeaseAccountingPipeline
 
 class GcContractAccountTests(unittest.TestCase):
     def setUp(self):
-        self.pipeline = LeaseAccountingPipeline("scratch")
+        self.fixed_account = "9000000001"
+        self.variable_account = "9000000002"
+        self.gc_variable_account = "9000000003"
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        workbook_path = Path(self.temp_dir.name) / "FACTURAS_CONTABILIZADAS.xlsx"
+        pd.DataFrame(
+            [
+                {"CUENTA CONTABLE": self.fixed_account, "NOMBRE CUENTA": "ARRIENDOS FIJOS", "SERIE": "RF"},
+                {"CUENTA CONTABLE": self.variable_account, "NOMBRE CUENTA": "ARRIENDO VARIABLE", "SERIE": "RV"},
+                {"CUENTA CONTABLE": self.gc_variable_account, "NOMBRE CUENTA": "ADMINISTRACION VARIABLE", "SERIE": "GC VARIABLE"},
+            ]
+        ).to_excel(workbook_path, sheet_name="CONSOLIDADO DE CUENTAS ARRI", index=False)
+        self.pipeline = LeaseAccountingPipeline("scratch", account_reference_path=workbook_path)
         self.item = {"description": "CUOTA DE ADMINISTRACION", "amount": 1000}
         self.pipeline.learning_dictionary = pd.DataFrame(
             [
                 {
                     "concept": "GC",
-                    "account": "1537210002",
+                    "account": self.gc_variable_account,
                     "phrases": "CUOTA DE ADMINISTRACION",
                     "text": "GC",
                 }
@@ -24,18 +39,18 @@ class GcContractAccountTests(unittest.TestCase):
     def test_positive_sell_media_uses_fixed_gc_account(self):
         concept, account = self.pipeline._item_line_classification(
             self.item,
-            {"account": "1537210002", "rent_type": "RV", "sell_media": 125000},
+            {"account": self.gc_variable_account, "rent_type": "RV", "sell_media": 125000},
         )
 
         self.assertEqual(concept, "GC")
-        self.assertEqual(account, "1245150017")
+        self.assertEqual(account, self.fixed_account)
 
     def test_user_learned_gc_selection_still_uses_contract_account(self):
         self.pipeline.learning_dictionary = pd.DataFrame(
             [
                 {
                     "concept": "GC",
-                    "account": "1537210002",
+                    "account": self.gc_variable_account,
                     "phrases": "ADM GC",
                     "text": "GC",
                 }
@@ -43,21 +58,21 @@ class GcContractAccountTests(unittest.TestCase):
         )
         concept, account = self.pipeline._item_line_classification(
             {"description": "ADM GC % 01.06-30.06.2026", "amount": 165196},
-            {"account": "1537210002", "rent_type": "RV", "sell_media": 1545851},
+            {"account": self.gc_variable_account, "rent_type": "RV", "sell_media": 1545851},
         )
 
         self.assertEqual(concept, "GC")
-        self.assertEqual(account, "1245150017")
+        self.assertEqual(account, self.fixed_account)
 
     def test_blank_dash_zero_or_missing_sell_media_use_variable_gc(self):
         for sell_media in [None, "-", "", 0]:
             with self.subTest(sell_media=sell_media):
                 concept, account = self.pipeline._item_line_classification(
                     self.item,
-                    {"account": "1245150017", "rent_type": "RF", "sell_media": sell_media},
+                    {"account": self.fixed_account, "rent_type": "RF", "sell_media": sell_media},
                 )
                 self.assertEqual(concept, "GC VARIABLE")
-                self.assertEqual(account, "1537210002")
+                self.assertEqual(account, self.gc_variable_account)
 
     def test_allocated_cost_text_uses_gc_variable(self):
         output_df = pd.DataFrame(
@@ -68,7 +83,7 @@ class GcContractAccountTests(unittest.TestCase):
                     "store": "T001",
                     "ceco": "6001",
                     "profit_center": "6001",
-                    "account": "1245150017",
+                    "account": self.fixed_account,
                     "concept": "RF",
                     "rent_type": "RF",
                     "sell_media": 0,
@@ -102,7 +117,7 @@ class GcContractAccountTests(unittest.TestCase):
         item_line = lines.loc[lines["line_type"].eq("invoice_item")].iloc[0]
 
         self.assertEqual(item_line["concept"], "GC VARIABLE")
-        self.assertEqual(item_line["account"], "1537210002")
+        self.assertEqual(item_line["account"], self.gc_variable_account)
         self.assertIn("GC VARIABLE", item_line["text"])
 
     def test_contract_loader_preserves_sell_media_column(self):

@@ -77,57 +77,22 @@ class PipelineResult:
 
 
 class LeaseAccountingPipeline:
-    FIXED_ACCOUNT = "1245150017"
-    VARIABLE_ACCOUNT = "1537210004"
-    SELL_CAM_VARIABLE_ACCOUNT = "1537210002"
-    VAT_ACCOUNT = "1149120011"
     TEXT_MAX_LENGTH = 50
     PAYMENT_TERMS_DEFAULT = "0001"
     PAYMENT_MODE_DEFAULT = "B - AR-Customer ACH(PRL Franchise)"
     PARTNER_BANK_DEFAULT = "_ - _"
-    CONCEPT_RULES = [
-        ("1245150017", "ARRIENDOS FIJOS", "RF"),
-        ("1537210004", "ARRIENDO VARIABLE", "RV"),
-        ("1537210004", "INTERESES MORA CON FACTURAS DE LAS TIENDAS RENTA GC", "INTERES"),
-        ("1245150017", "ADMINISTRACION SELL CAM", "GC"),
-        ("1537210002", "ADMINISTRACION VARIABLE", "GC"),
-        ("1245150017", "FONDO DE PROMOCION SELL MEDIA", "FP"),
-        ("1537210003", "FONDO DE PROMOCION", "FP"),
-        ("1532002509", "GTO VTA OT GASTOS", "GV"),
-        ("1537210004", "INTERESES MORA", "INTERES"),
-        ("1532001600", "GTO VTA S ASEO VIG AIRE ACONDICIONADO ASEO FUMIGACION", "ASEO /AIRE ACON/FUMIGACION"),
-        ("1532001600", "GTO VTA S ASEO VIG", "VIGILANCIA"),
-        ("1532001605", "ENERGIA", "ENERGÍA"),
-        ("1534001605", "AGUA Y DRENAJE OFICINA", "ACUED"),
-        ("1532001604", "ACUEDUCTO Y ACANTARILLADO", "ACUED"),
-        ("1537180003", "WATER SEWER", "ACUED"),
-        ("1532001800", "MANTENIMIENTO DE TIENDAS", "MTTO"),
-        ("1532002507", "GASTOS DE VENTAS DIVERSOS PARQUEADEROS CECO 8140015", "GV"),
-    ]
-    ACCOUNT_FALLBACK_CONCEPTS = {
-        FIXED_ACCOUNT: "RF",
-        VARIABLE_ACCOUNT: "RV",
-        "1537210002": "GC",
-        "1537210003": "FP",
-        "1532002509": "GV",
-        "1532001600": "ASEO /AIRE ACON/FUMIGACION",
-        "1532001605": "ENERGÍA",
-        "1534001605": "ACUED",
-        "1532001604": "ACUED",
-        "1537180003": "ACUED",
-        "1532001800": "MTTO",
-        "1532002507": "GV",
-    }
+    CONCEPT_RULES = []
+    ACCOUNT_FALLBACK_CONCEPTS = {}
     ITEM_CONCEPT_RULES = [
-        ("VIGILANCIA", "1532001600", [r"\bVIGILANCIA\b"]),
-        ("ENERGÍA", "1532001605", [r"\bENERGIA\b", r"\bELECTRICA(?:S)?\b", r"\bKWH\b", r"\bLUZ\b"]),
-        ("ACUED", "1532001604", [r"\bAGUA\b", r"\bACUEDUCTO\b", r"\bALCANTARILLADO\b", r"\bWATER\b", r"\bSEWER\b", r"\bDRENAJE\b", r"\bAGUACONTADOR\b"]),
-        ("MTTO", "1532001800", [r"\bMANTENIMIENTO\b", r"\bMANTO\b", r"\bMTTO\b", r"\bREPARACION(?:ES)?\b"]),
-        ("ASEO /AIRE ACON/FUMIGACION", "1532001600", [r"\bASEO\b", r"\bAIRE\b", r"\bACONDICIONADO\b", r"\bFUMIGACION\b"]),
-        ("INTERES", "1537210004", [r"\bINTERES(?:ES)?\b", r"\bMORA\b"]),
-        ("FP", "1537210003", [r"\bMERCADEO\b", r"\bFONDO\b", r"\bIMPREVISTO(?:S)?\b", r"\bPROMOCION\b", r"\bRESERVA\b"]),
-        ("GV", "1532002509", [r"\bPUBLICIDAD\b", r"\bPUBLICIDADO\b", r"\bPARQUEADERO\b"]),
-        ("GC", "1537210002", [r"\bEXPENSAS?\b", r"\bEXPENSAS?\s+COMUNES?\b", r"\bGASTO\s+COMUN\b", r"\bADMIN", r"\bADMON\b", r"\bCUOTADEADMINISTRACION\b", r"\bCOPROPIEDAD\b", r"\bPROPIEDAD\s+HORIZONTAL\b", r"\bMODULO\s+GENERAL\b", r"\bCOMUNES?\s+GENERALES?\b"]),
+        ("VIGILANCIA", [r"\bVIGILANCIA\b"]),
+        ("ENERGÍA", [r"\bENERGIA\b", r"\bELECTRICA(?:S)?\b", r"\bKWH\b", r"\bLUZ\b"]),
+        ("ACUED", [r"\bAGUA\b", r"\bACUEDUCTO\b", r"\bALCANTARILLADO\b", r"\bWATER\b", r"\bSEWER\b", r"\bDRENAJE\b", r"\bAGUACONTADOR\b"]),
+        ("MTTO", [r"\bMANTENIMIENTO\b", r"\bMANTO\b", r"\bMTTO\b", r"\bREPARACION(?:ES)?\b"]),
+        ("ASEO /AIRE ACON/FUMIGACION", [r"\bASEO\b", r"\bAIRE\b", r"\bACONDICIONADO\b", r"\bFUMIGACION\b"]),
+        ("INTERES", [r"\bINTERES(?:ES)?\b", r"\bMORA\b"]),
+        ("FP", [r"\bMERCADEO\b", r"\bFONDO\b", r"\bIMPREVISTO(?:S)?\b", r"\bPROMOCION\b", r"\bRESERVA\b"]),
+        ("GV", [r"\bPUBLICIDAD\b", r"\bPUBLICIDADO\b", r"\bPARQUEADERO\b"]),
+        ("GC", [r"\bEXPENSAS?\b", r"\bEXPENSAS?\s+COMUNES?\b", r"\bGASTO\s+COMUN\b", r"\bADMIN", r"\bADMON\b", r"\bCUOTADEADMINISTRACION\b", r"\bCOPROPIEDAD\b", r"\bPROPIEDAD\s+HORIZONTAL\b", r"\bMODULO\s+GENERAL\b", r"\bCOMUNES?\s+GENERALES?\b"]),
     ]
     RENT_ITEM_PATTERNS = [
         r"\bESPACIO\s+FIJO\b",
@@ -326,7 +291,7 @@ class LeaseAccountingPipeline:
 
     DEFAULT_LEARNING_DICTIONARY = Path(__file__).resolve().parents[3] / "Diccionario_Conceptos_Simple.xlsx"
 
-    def __init__(self, output_dir: Path, learning_dictionary_path: Path | None = None):
+    def __init__(self, output_dir: Path, learning_dictionary_path: Path | None = None, account_reference_path: Path | None = None):
         self.base_output_dir = Path(output_dir)
         self.base_output_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir = self.base_output_dir
@@ -339,6 +304,149 @@ class LeaseAccountingPipeline:
         self.distribution_rules = pd.DataFrame()
         self.learning_dictionary_path = Path(learning_dictionary_path) if learning_dictionary_path else self.DEFAULT_LEARNING_DICTIONARY
         self.learning_dictionary = pd.DataFrame()
+        self.account_reference_path = Path(account_reference_path) if account_reference_path else self._default_account_reference_path()
+        self.FIXED_ACCOUNT = None
+        self.VARIABLE_ACCOUNT = None
+        self.VAT_ACCOUNT = None
+        self.account_reference = self._load_account_reference(self.account_reference_path)
+        self._configure_account_reference()
+
+    def _configure_account_reference(self) -> None:
+        self.FIXED_ACCOUNT = self._account_code_for_concept("RF")
+        self.VARIABLE_ACCOUNT = self._account_code_for_concept("RV")
+        self.VAT_ACCOUNT = (
+            self._account_code_for_concept("IVA")
+            or self._account_code_for_concept("VAT")
+            or self._account_code_for_concept("IMPUESTO AL VALOR AGREGADO")
+        )
+
+    def _default_account_reference_path(self) -> Path:
+        candidates = [
+            Path(__file__).resolve().parents[3] / "data" / "input" / "FACTURAS_CONTABILIZADAS.xlsx",
+            Path(__file__).resolve().parents[3] / "FACTURAS_CONTABILIZADAS.xlsx",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[0]
+
+    def _load_account_reference(self, path: Path | None) -> pd.DataFrame:
+        target_path = Path(path) if path else self._default_account_reference_path()
+        if not target_path.exists():
+            self.CONCEPT_RULES = []
+            self.ACCOUNT_FALLBACK_CONCEPTS = {}
+            return pd.DataFrame()
+
+        try:
+            sheets = pd.read_excel(target_path, sheet_name=None, dtype=str)
+        except Exception:
+            self.CONCEPT_RULES = []
+            self.ACCOUNT_FALLBACK_CONCEPTS = {}
+            return pd.DataFrame()
+
+        account_aliases = {"cuenta", "cuenta_contable", "gl_account", "account", "codigo", "codigo_cuenta", "n_cuenta"}
+        description_aliases = {"descripcion", "description", "nombre_cuenta", "nombre_de_cuenta", "texto", "detalle", "nombre"}
+        concept_aliases = {"concepto", "concept", "tipo", "rent_type", "serie", "codigo_concepto", "tipo_cuenta", "texto_corto_lucy"}
+        reference_tables = []
+        for sheet_name, sheet in sheets.items():
+            if sheet.empty:
+                continue
+            columns = {self._normalize_column_name(column): column for column in sheet.columns}
+            account_column = next((columns[key] for key in account_aliases if key in columns), None)
+            concept_column = next((columns[key] for key in concept_aliases if key in columns), None)
+            description_column = next((columns[key] for key in description_aliases if key in columns), None)
+            if not account_column:
+                header_row = self._find_reference_header_row(sheet, account_aliases | description_aliases | concept_aliases)
+                if header_row is not None:
+                    sheet = sheet.iloc[header_row + 1:].copy()
+                    sheet.columns = [self._normalize_column_name(value) for value in sheets[sheet_name].iloc[header_row]]
+                    columns = {str(column): column for column in sheet.columns}
+                    account_column = next((columns[key] for key in account_aliases if key in columns), None)
+                    concept_column = next((columns[key] for key in concept_aliases if key in columns), None)
+                    description_column = next((columns[key] for key in description_aliases if key in columns), None)
+            if not account_column or not concept_column:
+                if not account_column or not description_column:
+                    continue
+
+            selected = sheet[[account_column]].copy()
+            selected.columns = ["account"]
+            selected["description"] = sheet[description_column]
+            selected["concept"] = (
+                sheet[concept_column]
+                if concept_column
+                else selected["description"].map(self._infer_reference_concept)
+            )
+            reference_tables.append(selected)
+
+        if not reference_tables:
+            self.CONCEPT_RULES = []
+            self.ACCOUNT_FALLBACK_CONCEPTS = {}
+            return pd.DataFrame()
+
+        normalized = pd.concat(reference_tables, ignore_index=True).fillna("")
+
+        normalized["account"] = normalized["account"].map(self._clean_numeric_code)
+        normalized["concept"] = normalized["concept"].map(self._clean_text)
+        normalized["description"] = normalized["description"].map(self._clean_text)
+        normalized = normalized[normalized["account"].notna() & normalized["concept"].astype(str).str.strip().ne("")]
+        normalized = normalized.drop_duplicates(subset=["account", "concept", "description"])
+        self.CONCEPT_RULES = [
+            (row["account"], row["description"], row["concept"])
+            for _, row in normalized.iterrows()
+            if row["description"]
+        ]
+        self.ACCOUNT_FALLBACK_CONCEPTS = {
+            row["account"]: row["concept"]
+            for _, row in normalized.drop_duplicates(subset=["account"], keep="first").iterrows()
+            if row["account"] and row["concept"]
+        }
+        return normalized
+
+    def _find_reference_header_row(self, sheet: pd.DataFrame, aliases: set[str]) -> int | None:
+        for row_index, row in sheet.iterrows():
+            values = {self._normalize_column_name(value) for value in row.tolist() if self._clean_text(value)}
+            if values & aliases:
+                return int(row_index)
+        return None
+
+    def _infer_reference_concept(self, value) -> str:
+        text = self._concept_key(value)
+        if not text:
+            return ""
+        if "ARRIENDO FIJO" in text or "ARRIENDOS FIJOS" in text:
+            return "RF"
+        if "ARRIENDO VARIABLE" in text:
+            return "RV"
+        if "CUENTA DEL IVA" in text or text == "IVA" or " IMPUESTO AL VALOR " in f" {text} ":
+            return "IVA"
+        if "INTERES" in text or "MORA" in text:
+            return "INTERES"
+        if "ADMINISTRACION" in text or "ADMON" in text:
+            return "GC"
+        if "FONDO" in text or "PROMOCION" in text:
+            return "FP"
+        if "ENERGIA" in text or "ELECTR" in text:
+            return "ENERGÍA"
+        if any(token in text for token in ("AGUA", "ACUEDUCTO", "ALCANTARILLADO", "WATER", "SEWER", "DRENAJE")):
+            return "ACUED"
+        if "MANTENIMIENTO" in text:
+            return "MTTO"
+        if any(token in text for token in ("ASEO", "AIRE", "FUMIGACION")):
+            return "ASEO /AIRE ACON/FUMIGACION"
+        if "VIG" in text:
+            return "VIGILANCIA"
+        if any(token in text for token in ("GTO VTA", "GASTOS", "RECUPERACION", "PARQUEADERO")):
+            return "GV"
+        return ""
+
+    def _account_code_for_concept(self, concept: str | None) -> str | None:
+        target = self._concept_key(concept)
+        if not target:
+            return None
+        for account_code, mapped_concept in self.ACCOUNT_FALLBACK_CONCEPTS.items():
+            if self._concept_key(mapped_concept) == target:
+                return account_code
+        return None
 
     def run(
         self,
@@ -411,6 +519,15 @@ class LeaseAccountingPipeline:
         self.discount_review_items = []
         self.beneficiary_review_items = []
         self.preflight_processing_issues = []
+        if history_path is not None:
+            self.account_reference_path = Path(history_path)
+            self.account_reference = self._load_account_reference(self.account_reference_path)
+            self._configure_account_reference()
+        if not self.FIXED_ACCOUNT or not self.VARIABLE_ACCOUNT:
+            raise PipelineError(
+                "No se encontraron las cuentas RF y RV en FACTURAS_CONTABILIZADAS.xlsx. "
+                "Revisa que el consolidado incluya las columnas de cuenta y concepto/serie."
+            )
         self.learning_dictionary = self._load_learning_dictionary(self.learning_dictionary_path)
         data = self.load_data(
             invoices_path=invoices_path,
@@ -778,7 +895,6 @@ class LeaseAccountingPipeline:
         contracts["end_of_term"] = pd.to_datetime(contracts["end_of_term"], errors="coerce")
         contracts["rent_min"] = pd.to_numeric(contracts["rent_min"], errors="coerce").fillna(0)
         contracts["sell_media"] = pd.to_numeric(contracts["sell_media"], errors="coerce").fillna(0)
-        contracts["sell_cam"] = pd.to_numeric(contracts["sell_cam"], errors="coerce").fillna(0)
 
         prorateo = cleaned["prorateo"]
         if "vendor_code" not in prorateo.columns:
@@ -991,7 +1107,7 @@ class LeaseAccountingPipeline:
         )
 
         merged = merged.merge(
-            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "sell_cam", "status_en_rem"]],
+            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "status_en_rem"]],
             left_on="mapped_ceco_key",
             right_on="ceco_key",
             how="left",
@@ -1127,7 +1243,6 @@ class LeaseAccountingPipeline:
                 "concept",
                 "rent_type",
                 "sell_media",
-                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -1545,7 +1660,6 @@ class LeaseAccountingPipeline:
                         "end_of_term": ["end_of_term", "end_of_term_en_virtual_contract"],
                         "rent_min": ["rent_min_rent", "rent_min"],
                         "sell_media": ["sell_media"],
-                        "sell_cam": ["sell_cam", "administracion_sell_cam"],
                         "status_en_rem": ["status_en_rem"],
                     },
                 )
@@ -1566,7 +1680,6 @@ class LeaseAccountingPipeline:
                 "end_of_term",
                 "rent_min",
                 "sell_media",
-                "sell_cam",
                 "status_en_rem",
                 "country_sheet",
                 "source_row",
@@ -2847,20 +2960,6 @@ class LeaseAccountingPipeline:
                 ]
             line_rows.extend(expense_rows)
 
-            sell_cam_account, sell_cam_text, sell_cam_amount = self._sell_cam_line_payload(row)
-            line_rows.append(
-                {
-                    **base,
-                    "line_type": "sell_cam",
-                    "posting_key": "40",
-                    "account": sell_cam_account,
-                    "concept": "ADMINISTRACION SELL CAM",
-                    "tax_code": self._expense_tax_code(row),
-                    "amount": round_cop(sell_cam_amount, 0),
-                    "text": sell_cam_text,
-                }
-            )
-
             posting_discount_total = pd.to_numeric(
                 pd.Series([row.get("posting_discount_total")]),
                 errors="coerce",
@@ -3858,7 +3957,7 @@ class LeaseAccountingPipeline:
         sell_media = pd.to_numeric(pd.Series([row.get("sell_media")]), errors="coerce").iloc[0]
         if pd.notna(sell_media) and float(sell_media) > 0:
             return "GC", self.FIXED_ACCOUNT
-        return "GC VARIABLE", "1537210002"
+        return "GC VARIABLE", self._account_code_for_concept("GC VARIABLE") or self._account_code_for_concept("GC")
 
     def _match_learning_dictionary(self, description: str | None, row) -> tuple[str, str] | None:
         description_key = self._concept_key(normalize_learning_phrase(description))
@@ -3979,36 +4078,6 @@ class LeaseAccountingPipeline:
         if not status:
             return False
         return status in {"VIGENTE", "POR VENCER"}
-
-    def _has_sell_cam_amount(self, value) -> bool:
-        if value is None:
-            return False
-
-        if isinstance(value, (int, float)) and not pd.isna(value):
-            return float(value) != 0
-
-        text = self._clean_text(value)
-        if not text:
-            return False
-
-        cleaned = re.sub(r"[^0-9,.\-]", "", text).replace(",", ".")
-        if cleaned in {"", ".", "-", "-.", "--"}:
-            return False
-
-        try:
-            return float(cleaned) != 0
-        except ValueError:
-            return False
-
-    def _sell_cam_line_payload(self, row) -> tuple[str, str, float]:
-        has_amount = self._has_sell_cam_amount(row.get("sell_cam"))
-        amount = pd.to_numeric(pd.Series([row.get("sell_cam")]), errors="coerce").iloc[0]
-        if pd.isna(amount):
-            amount = 0.0
-
-        account = self.FIXED_ACCOUNT if has_amount else self.SELL_CAM_VARIABLE_ACCOUNT
-        text = "Administracion fijo" if has_amount else "Administracion variado"
-        return account, text, float(amount)
 
     def _is_blocked_contract_status(self, value) -> bool:
         status = self._concept_key(value)

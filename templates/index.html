@@ -114,7 +114,13 @@
             <!-- SECCIÓN 2: BASES DE DATOS MAESTRAS Y REFERENCIAS (OPCIONALES - USAN LOCAL) -->
             <section class="panel">
                 <div class="section-title-wrapper">
-                    <h2>2. Bases de Datos Maestras y Referencias (Opcional - Usa local si se deja vacío)</h2>
+                    <h2>2. Bases de Datos Maestras y Referencias</h2>
+                </div>
+                <div class="form-helpers">
+                    <div class="helper-card">
+                        <strong>Primera vez:</strong>
+                        La aplicaci&oacute;n abre sin bases de datos. Solo al procesar el archivo del mes (secci&oacute;n 1) deber&aacute;s cargar las bases requeridas que falten. Despu&eacute;s se guardar&aacute;n localmente.
+                    </div>
                 </div>
                 <div class="grid">
                     <div class="input-group">
@@ -188,6 +194,17 @@
                         Si subes una nueva base de datos maestra, reemplazará la versión local para futuras corridas y la aplicación conservará un respaldo de la versión anterior.
                     </div>
                 </div>
+
+                {% if master_status %}
+                    <div class="form-helpers">
+                        {% for master in master_status if master.required %}
+                            <div class="helper-card">
+                                <strong>{{ master.filename }}:</strong>
+                                {% if master.available %}disponible localmente.{% else %}pendiente de cargar.{% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
                 <button type="submit" id="submitBtn">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>

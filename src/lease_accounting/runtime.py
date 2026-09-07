@@ -3,22 +3,12 @@ from __future__ import annotations
 import atexit
 import os
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 
 
 APP_NAME = "ArriendosAutomation"
 DICTIONARY_FILENAME = "Diccionario_Conceptos_Simple.xlsx"
-PACKAGED_MASTER_FILENAMES = (
-    "CONTROL_ARRI_ADMON.xlsx",
-    "Contratos_con_condiciones.xlsx",
-    "PRORATEO.xlsx",
-    "Cuadro_de_distribucion.xls",
-    "FACTURAS_CONTABILIZADAS.xlsx",
-    "Arriendos_Macro.xlsm",
-)
-
 FROZEN = bool(getattr(sys, "frozen", False))
 RESOURCE_DIR = (
     Path(getattr(sys, "_MEIPASS")).resolve()
@@ -70,17 +60,6 @@ def initialize_runtime() -> None:
         DICTIONARY_BACKUP_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
-
-    if not FROZEN:
-        return
-
-    packaged_input_dir = RESOURCE_DIR / "data" / "input"
-    for filename in PACKAGED_MASTER_FILENAMES:
-        source = packaged_input_dir / filename
-        destination = INPUT_DIR / filename
-        if source.exists() and not destination.exists():
-            shutil.copy2(source, destination)
-
 
 def cleanup_runtime() -> None:
     if _session_dir and _session_dir.exists():

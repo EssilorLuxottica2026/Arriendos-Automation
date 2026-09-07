@@ -13,18 +13,6 @@ datas = [
     (str(project_root / "static"), "static"),
 ]
 
-for filename in (
-    "CONTROL_ARRI_ADMON.xlsx",
-    "Contratos_con_condiciones.xlsx",
-    "PRORATEO.xlsx",
-    "Cuadro_de_distribucion.xls",
-    "FACTURAS_CONTABILIZADAS.xlsx",
-    "Arriendos_Macro.xlsm",
-):
-    source = project_root / "data" / "input" / filename
-    if source.exists():
-        datas.append((str(source), "data/input"))
-
 a = Analysis(
     ["desktop_app.py"],
     pathex=[str(project_root / "src")],
