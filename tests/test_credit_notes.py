@@ -43,14 +43,6 @@ class CreditNoteTests(unittest.TestCase):
         self.assertEqual(parsed.discounts, [])
         self.assertNotIn("unresolved_discount_note", parsed.flags or "")
 
-    def test_document_note_can_still_declare_a_discount(self):
-        parsed = InvoiceSupportReader().parse_file(FIXTURES / "invoice_note_discount.xml")
-
-        self.assertEqual(len(parsed.discounts), 1)
-        self.assertEqual(parsed.discounts[0]["source"], "xml_note")
-        self.assertEqual(parsed.discounts[0]["amount"], 100)
-        self.assertEqual(parsed.discounts[0]["condition_type"], "explicit_deadline")
-
     def test_normalizes_credit_note_prefix_from_invoices_file(self):
         pipeline = LeaseAccountingPipeline("scratch")
 

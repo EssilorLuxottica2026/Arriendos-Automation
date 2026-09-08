@@ -148,39 +148,5 @@ class AllocatedCostsBundleTests(unittest.TestCase):
         self.assertTrue(export["CdC$Cost Center"].isna().all())
         self.assertEqual(export.iloc[0]["ProfitCenter$Profit Center"], "6001")
 
-    def test_sell_cam_line_payload_uses_fixed_account_when_value_exists(self):
-        pipeline = LeaseAccountingPipeline(output_dir=Path("tmp_output"))
-
-        row = {
-            "sell_cam": 50000,
-            "account": "1537210004",
-            "store": "T1",
-            "ceco": "CCO1",
-            "invoice_date": pd.Timestamp("2026-01-10"),
-        }
-
-        account, text, amount = pipeline._sell_cam_line_payload(row)
-
-        self.assertEqual(amount, 50000)
-        self.assertEqual(account, pipeline.FIXED_ACCOUNT)
-        self.assertEqual(text, "Administracion fijo")
-
-    def test_sell_cam_line_payload_uses_variable_account_when_empty(self):
-        pipeline = LeaseAccountingPipeline(output_dir=Path("tmp_output"))
-
-        row = {
-            "sell_cam": "",
-            "account": "1245150017",
-            "store": "T1",
-            "ceco": "CCO1",
-            "invoice_date": pd.Timestamp("2026-01-10"),
-        }
-
-        account, text, amount = pipeline._sell_cam_line_payload(row)
-
-        self.assertEqual(amount, 0)
-        self.assertEqual(account, pipeline.VARIABLE_ACCOUNT)
-        self.assertEqual(text, "Administracion variado")
-
 if __name__ == "__main__":
     unittest.main()

@@ -173,6 +173,11 @@ class InvoiceSupportReader:
     def _parse_xml_file(self, path: Path) -> ParsedInvoiceSupport:
         document_root = self._extract_invoice_root_from_xml(path)
         document_type = self._local_name(document_root)
+        monetary_total_path = (
+            ".//cac:RequestedMonetaryTotal/cbc:LineExtensionAmount"
+            if document_type == "DebitNote"
+            else ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount"
+        )
         invoice_id = self._find_text(document_root, "./cbc:ID")
         supplier_id = self._find_text(document_root, ".//cac:AccountingSupplierParty//cbc:CompanyID")
         supplier_name = (
@@ -184,7 +189,7 @@ class InvoiceSupportReader:
             self._find_text(document_root, ".//cac:PaymentMeans/cbc:PaymentDueDate")
             or self._find_text(document_root, "./cbc:DueDate")
         )
-        subtotal = round_cop(self._parse_number(self._find_text(document_root, ".//cac:LegalMonetaryTotal/cbc:LineExtensionAmount")))
+        subtotal = round_cop(self._parse_number(self._find_text(document_root, monetary_total_path)))
         total = round_cop(self._parse_number(self._find_text(document_root, ".//cac:LegalMonetaryTotal/cbc:PayableAmount")))
         detected_iva = self._resolve_xml_tax_amount(document_root, subtotal, total)
         has_zero_iva_hint = detected_iva == 0
@@ -249,12 +254,12 @@ class InvoiceSupportReader:
     def _extract_invoice_root_from_xml(self, path: Path) -> ET.Element:
         root = ET.parse(path).getroot()
         root_type = self._local_name(root)
-        if root_type in {"Invoice", "CreditNote"}:
+        if root_type in {"Invoice", "CreditNote", "DebitNote"}:
             return root
 
         for description in root.findall(f".//{{{self.XML_CBC_NS}}}Description"):
             raw_text = description.text or ""
-            for embedded_type in ("Invoice", "CreditNote"):
+            for embedded_type in ("Invoice", "CreditNote", "DebitNote"):
                 match = re.search(
                     rf"(<{embedded_type}\b[\s\S]*</{embedded_type}>)",
                     raw_text,
@@ -415,6 +420,7 @@ class InvoiceSupportReader:
             quantity = self._parse_number(
                 self._find_text(line, "./cbc:InvoicedQuantity")
                 or self._find_text(line, "./cbc:CreditedQuantity")
+                or self._find_text(line, "./cbc:DebitedQuantity")
             )
             if description is None and amount is None:
                 continue
@@ -491,7 +497,7 @@ class InvoiceSupportReader:
 
             parent = parents.get(allowance)
             scope = self._local_name(parent) if parent is not None else "Invoice"
-            is_line_scope = scope in {"InvoiceLine", "CreditNoteLine"}
+            is_line_scope = scope in {"InvoiceLine", "CreditNoteLine", "DebitNoteLine"}
             line_id = self._find_text(parent, "./cbc:ID") if is_line_scope else None
             if not is_line_scope:
                 document_allowance_sum += amount
@@ -845,6 +851,7 @@ class InvoiceSupportReader:
         return (
             root.findall(".//cac:InvoiceLine", self.XML_NS)
             + root.findall(".//cac:CreditNoteLine", self.XML_NS)
+            + root.findall(".//cac:DebitNoteLine", self.XML_NS)
         )
 
     def _extract_xml_line_description(self, line: ET.Element) -> str | None:

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DebitNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"
+    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:ID>ND-1</cbc:ID>
+    <cac:RequestedMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">900</cbc:LineExtensionAmount>
+    </cac:RequestedMonetaryTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">100</cbc:LineExtensionAmount>
+        <cbc:PayableAmount currencyID="COP">119</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    <cac:DebitNoteLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:DebitedQuantity unitCode="EA">2</cbc:DebitedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">900</cbc:LineExtensionAmount>
+        <cac:Item><cbc:Description>RECARGO ADMINISTRATIVO</cbc:Description></cac:Item>
+    </cac:DebitNoteLine>
+</DebitNote>

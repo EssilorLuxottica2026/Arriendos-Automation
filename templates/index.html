@@ -64,21 +64,31 @@
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             <span>Excel de arriendos (tabla que llega al correo)</span>
+                            <span class="file-status-dot" data-file-status="invoices_file" data-initial-available="false" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                             <span class="required-badge">*</span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="invoices_file" accept=".xlsx,.xls,.csv,.xml" required>
                         </div>
+                        <div class="selected-file-list" data-file-list="invoices_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             <span>Facturas XML (Soportes múltiples)</span>
+                            <span class="file-status-dot" data-file-status="invoice_support_files" data-initial-available="false" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files" accept=".pdf,.xml" multiple>
                         </div>
+                        <details class="selected-file-dropdown" data-support-dropdown="invoice_support_files">
+                            <summary>Facturas XML seleccionadas (<span data-support-count>0</span>)</summary>
+                            <div class="selected-file-search-wrapper">
+                                <input type="search" class="selected-file-search" data-support-search placeholder="Buscar por nombre de factura" aria-label="Buscar factura XML por nombre">
+                            </div>
+                            <div class="selected-file-list" data-support-list></div>
+                        </details>
                     </div>
 
                     <div class="input-group">
@@ -89,6 +99,13 @@
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files_split_2" accept=".pdf,.xml" multiple>
                         </div>
+                        <details class="selected-file-dropdown" data-support-dropdown="invoice_support_files_split_2">
+                            <summary>XML para 2 tiendas seleccionados (<span data-support-count>0</span>)</summary>
+                            <div class="selected-file-search-wrapper">
+                                <input type="search" class="selected-file-search" data-support-search placeholder="Buscar por nombre de factura" aria-label="Buscar XML para 2 tiendas por nombre">
+                            </div>
+                            <div class="selected-file-list" data-support-list></div>
+                        </details>
                     </div>
 
                     <div class="input-group">
@@ -99,6 +116,13 @@
                         <div class="file-input-wrapper">
                             <input type="file" name="invoice_support_files_split_3" accept=".pdf,.xml" multiple>
                         </div>
+                        <details class="selected-file-dropdown" data-support-dropdown="invoice_support_files_split_3">
+                            <summary>XML para 3 tiendas seleccionados (<span data-support-count>0</span>)</summary>
+                            <div class="selected-file-search-wrapper">
+                                <input type="search" class="selected-file-search" data-support-search placeholder="Buscar por nombre de factura" aria-label="Buscar XML para 3 tiendas por nombre">
+                            </div>
+                            <div class="selected-file-list" data-support-list></div>
+                        </details>
                     </div>
 
                     <div class="input-group">
@@ -109,6 +133,11 @@
                         <input type="text" name="period" class="text-input-field" placeholder="Ej: 05-2026">
                     </div>
                 </div>
+                
+                <button type="submit" id="submitBtn" formaction="{{ url_for('process') }}" formmethod="post" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <span>Procesar archivos</span>
+                </button>
             </section>
 
             <!-- SECCIÓN 2: BASES DE DATOS MAESTRAS Y REFERENCIAS (OPCIONALES - USAN LOCAL) -->
@@ -119,7 +148,7 @@
                 <div class="form-helpers">
                     <div class="helper-card">
                         <strong>Primera vez:</strong>
-                        La aplicaci&oacute;n abre sin bases de datos. Solo al procesar el archivo del mes (secci&oacute;n 1) deber&aacute;s cargar las bases requeridas que falten. Despu&eacute;s se guardar&aacute;n localmente.
+                        Guarda las bases de datos de esta secci&oacute;n con su bot&oacute;n antes de procesar el archivo del mes.
                     </div>
                 </div>
                 <div class="grid">
@@ -127,60 +156,72 @@
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                             <span>CONTROL ARRI ADMON</span>
+                            <span class="file-status-dot" data-file-status="control_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'control_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="control_file" accept=".xlsx,.xls">
                         </div>
+                        <div class="selected-file-list" data-file-list="control_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             <span>Contratos con condiciones</span>
+                            <span class="file-status-dot" data-file-status="contracts_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'contracts_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="contracts_file" accept=".xlsx,.xls">
                         </div>
+                        <div class="selected-file-list" data-file-list="contracts_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             <span>PRORATEO de IVA</span>
+                            <span class="file-status-dot" data-file-status="prorateo_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'prorateo_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="prorateo_file" accept=".xlsx,.xls">
                         </div>
+                        <div class="selected-file-list" data-file-list="prorateo_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                             <span>Cuadro de distribución</span>
+                            <span class="file-status-dot" data-file-status="distribution_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'distribution_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="distribution_file" accept=".xlsx,.xls">
                         </div>
+                        <div class="selected-file-list" data-file-list="distribution_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             <span>Facturas contabilizadas (Histórico)</span>
+                            <span class="file-status-dot" data-file-status="history_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'history_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="history_file" accept=".xlsx,.xls,.xlsm,.csv">
                         </div>
+                        <div class="selected-file-list" data-file-list="history_file"></div>
                     </div>
 
                     <div class="input-group">
                         <div class="input-label">
                             <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
                             <span>Plantilla base de Macros (.xlsm)</span>
+                            <span class="file-status-dot" data-file-status="macro_workbook_file" data-initial-available="{{ 'true' if (master_status|selectattr('key', 'equalto', 'macro_workbook_file')|selectattr('available')|list) else 'false' }}" title="Archivo no cargado" aria-label="Archivo no cargado"></span>
                         </div>
                         <div class="file-input-wrapper">
                             <input type="file" name="macro_workbook_file" accept=".xlsm,.xlsx,.xls">
                         </div>
+                        <div class="selected-file-list" data-file-list="macro_workbook_file"></div>
                     </div>
                 </div>
 
@@ -195,31 +236,167 @@
                     </div>
                 </div>
 
-                {% if master_status %}
-                    <div class="form-helpers">
-                        {% for master in master_status if master.required %}
-                            <div class="helper-card">
-                                <strong>{{ master.filename }}:</strong>
-                                {% if master.available %}disponible localmente.{% else %}pendiente de cargar.{% endif %}
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-
-                <button type="submit" id="submitBtn">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    <span>Procesar archivos</span>
+                <button type="submit" id="saveMastersBtn" formaction="{{ url_for('save_masters') }}" formmethod="post" formnovalidate disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M5 4h11l3 3v13H5V4Zm3 0v5h8V4M8 20v-6h8v6"></path></svg>
+                    <span>Guardar bases de datos</span>
                 </button>
             </section>
         </form>
     </main>
 
     <script>
-        document.querySelector('form').addEventListener('submit', function() {
+        const invoiceInput = document.querySelector('input[name="invoices_file"]');
+        const supportInputs = [
+            ...document.querySelectorAll('input[name="invoice_support_files"]'),
+            ...document.querySelectorAll('input[name="invoice_support_files_split_2"]'),
+            ...document.querySelectorAll('input[name="invoice_support_files_split_3"]'),
+        ];
+        const processButton = document.getElementById('submitBtn');
+        const supportInputNames = new Set([
+            'invoice_support_files',
+            'invoice_support_files_split_2',
+            'invoice_support_files_split_3',
+        ]);
+        const masterInputs = [
+            'control_file',
+            'contracts_file',
+            'prorateo_file',
+            'distribution_file',
+            'history_file',
+            'macro_workbook_file',
+        ].map(name => document.querySelector(`input[name="${name}"]`));
+        const saveMastersButton = document.getElementById('saveMastersBtn');
+
+        function updateSelectedFileList(input) {
+            const list = document.querySelector(`[data-file-list="${input.name}"]`);
+            if (!list) return;
+            list.replaceChildren();
+            Array.from(input.files).forEach(function(file, fileIndex) {
+                const item = document.createElement('div');
+                item.className = 'selected-file-item';
+                const name = document.createElement('span');
+                name.textContent = file.name;
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'selected-file-remove';
+                removeButton.textContent = 'Eliminar';
+                removeButton.title = `Eliminar ${file.name}`;
+                removeButton.addEventListener('click', function() {
+                    const remainingFiles = Array.from(input.files).filter((_, index) => index !== fileIndex);
+                    const transfer = new DataTransfer();
+                    remainingFiles.forEach(remainingFile => transfer.items.add(remainingFile));
+                    input.files = transfer.files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                item.append(name, removeButton);
+                list.appendChild(item);
+            });
+        }
+
+        function renderSupportFiles(input) {
+            const dropdown = document.querySelector(`[data-support-dropdown="${input.name}"]`);
+            if (!dropdown) return;
+            const query = (dropdown.querySelector('[data-support-search]').value || '').trim().toLowerCase();
+            const count = dropdown.querySelector('[data-support-count]');
+            const list = dropdown.querySelector('[data-support-list]');
+            const files = Array.from(input.files).map((file, fileIndex) => ({ input, file, fileIndex }));
+            count.textContent = files.length;
+            dropdown.hidden = files.length === 0;
+            list.replaceChildren();
+            files
+                .filter(entry => entry.file.name.toLowerCase().includes(query))
+                .forEach(function(entry) {
+                    const item = document.createElement('div');
+                    item.className = 'selected-file-item';
+                    const name = document.createElement('span');
+                    name.textContent = entry.file.name;
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'selected-file-remove';
+                    removeButton.textContent = 'Eliminar';
+                    removeButton.title = `Eliminar ${entry.file.name}`;
+                    removeButton.addEventListener('click', function() {
+                        const remainingFiles = Array.from(entry.input.files)
+                            .filter((_, index) => index !== entry.fileIndex);
+                        const transfer = new DataTransfer();
+                        remainingFiles.forEach(file => transfer.items.add(file));
+                        entry.input.files = transfer.files;
+                        entry.input.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                    item.append(name, removeButton);
+                    list.appendChild(item);
+                });
+        }
+
+        function updateProcessButton() {
+            const hasInvoices = invoiceInput && invoiceInput.files.length > 0;
+            const hasSupports = supportInputs.some(input => input.files.length > 0);
+            processButton.disabled = !(hasInvoices && hasSupports);
+        }
+
+        function updateSaveMastersButton() {
+            saveMastersButton.disabled = !masterInputs.some(input => input && input.files.length > 0);
+        }
+
+        [invoiceInput, ...supportInputs].forEach(function(input) {
+            if (!input) return;
+            input.addEventListener('change', function() {
+                if (supportInputNames.has(input.name)) {
+                    renderSupportFiles(input);
+                } else {
+                    updateSelectedFileList(input);
+                }
+                updateProcessButton();
+            });
+        });
+        updateProcessButton();
+        supportInputs.forEach(function(input) {
+            const dropdown = document.querySelector(`[data-support-dropdown="${input.name}"]`);
+            dropdown.querySelector('[data-support-search]').addEventListener('input', function() {
+                renderSupportFiles(input);
+            });
+            renderSupportFiles(input);
+        });
+        masterInputs.forEach(function(input) {
+            if (input) {
+                input.addEventListener('change', function() {
+                    updateSelectedFileList(input);
+                    updateSaveMastersButton();
+                });
+            }
+        });
+        updateSaveMastersButton();
+
+        document.querySelectorAll('[data-file-status]').forEach(function(statusDot) {
+            const input = document.querySelector(`input[name="${statusDot.dataset.fileStatus}"]`);
+            const setStatus = function(isAvailable) {
+                statusDot.classList.toggle('is-available', isAvailable);
+                statusDot.title = isAvailable ? 'Archivo encontrado' : 'Archivo no encontrado';
+                statusDot.setAttribute('aria-label', statusDot.title);
+            };
+
+            setStatus(statusDot.dataset.initialAvailable === 'true');
+            if (input) {
+                input.addEventListener('change', function() {
+                    setStatus(input.files.length > 0 || statusDot.dataset.initialAvailable === 'true');
+                });
+            }
+        });
+
+        document.querySelector('form').addEventListener('submit', function(event) {
             const btn = document.getElementById('submitBtn');
-            btn.classList.add('loading');
-            btn.querySelector('span').textContent = 'Procesando información...';
-            btn.style.pointerEvents = 'none';
+            const saveBtn = document.getElementById('saveMastersBtn');
+            const submitter = event.submitter;
+            const isSaving = submitter === saveBtn;
+            const activeButton = isSaving ? saveBtn : btn;
+            if (isSaving) {
+                return;
+            }
+            activeButton.classList.add('loading');
+            activeButton.querySelector('span').textContent = isSaving
+                ? 'Guardando bases...'
+                : 'Procesando información...';
+            activeButton.style.pointerEvents = 'none';
         });
     </script>
 </body>
