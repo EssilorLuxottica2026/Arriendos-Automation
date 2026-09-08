@@ -149,6 +149,21 @@ def _resolve_and_save_master(key: str, file_storage, batch_dir: Path) -> Path | 
         
     return None
 
+def _resolve_existing_master(key: str) -> Path | None:
+    standard_name = MASTER_FILENAMES.get(key)
+    if not standard_name:
+        return None
+
+    target_master_path = INPUT_DIR / standard_name
+    if target_master_path.exists():
+        return target_master_path
+    if key in REQUIRED_MASTER_KEYS:
+        raise PipelineError(
+            f"El archivo maestro obligatorio '{standard_name}' no se encuentra en el servidor. "
+            "Guárdalo desde la sección 2 antes de procesar."
+        )
+    return None
+
 
 def _job_path(batch_id: str) -> Path:
     return UPLOAD_DIR / batch_id / "concept_review_job.json"
@@ -712,13 +727,12 @@ def process():
     try:
         invoices_path = _save_upload(invoices_file, batch_dir)
         
-        control_path = _resolve_and_save_master("control_file", request.files.get("control_file"), batch_dir)
-        contracts_path = _resolve_and_save_master("contracts_file", request.files.get("contracts_file"), batch_dir)
-        prorateo_path = _resolve_and_save_master("prorateo_file", request.files.get("prorateo_file"), batch_dir)
-        distribution_path = _resolve_and_save_master("distribution_file", request.files.get("distribution_file"), batch_dir)
-        
-        history_path = _resolve_and_save_master("history_file", request.files.get("history_file"), batch_dir)
-        macro_workbook_path = _resolve_and_save_master("macro_workbook_file", request.files.get("macro_workbook_file"), batch_dir)
+        control_path = _resolve_existing_master("control_file")
+        contracts_path = _resolve_existing_master("contracts_file")
+        prorateo_path = _resolve_existing_master("prorateo_file")
+        distribution_path = _resolve_existing_master("distribution_file")
+        history_path = _resolve_existing_master("history_file")
+        macro_workbook_path = _resolve_existing_master("macro_workbook_file")
 
         support_paths = []
         support_display_names = {}
@@ -783,6 +797,31 @@ def process():
     except Exception as exc:  # pragma: no cover
         flash(f"Unexpected error: {exc}")
         return redirect(url_for("index"))
+
+
+@app.route("/save-masters", methods=["POST"])
+def save_masters():
+    master_keys = tuple(MASTER_FILENAMES)
+    uploaded_keys = [
+        key for key in master_keys
+        if request.files.get(key) and request.files[key].filename
+    ]
+    if not uploaded_keys:
+        flash("Selecciona al menos una base de datos en la sección 2 para guardarla.", "warning")
+        return redirect(url_for("index"))
+
+    batch_id = uuid4().hex
+    batch_dir = UPLOAD_DIR / batch_id
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for key in uploaded_keys:
+            _resolve_and_save_master(key, request.files.get(key), batch_dir)
+        flash("Las bases de datos seleccionadas se guardaron correctamente.", "success")
+    except PipelineError as exc:
+        flash(str(exc), "error")
+    except Exception as exc:  # pragma: no cover
+        flash(f"Unexpected error: {exc}", "error")
+    return redirect(url_for("index"))
 
 
 @app.route("/split-review/<batch_id>", methods=["POST"])
