@@ -97,14 +97,12 @@
             groupedItems.get(category).push(item);
         });
 
-        let firstGroup = true;
         groupedItems.forEach((items, category) => {
             if (!items.length) return;
             const details = document.createElement('details');
             details.className = 'process-warning-group';
             details.dataset.warningGroup = category;
-            details.open = firstGroup;
-            firstGroup = false;
+            details.open = false;
 
             const summary = document.createElement('summary');
             summary.innerHTML = `<span>${category}</span><span class="process-warning-group-count">${items.length}</span>`;
