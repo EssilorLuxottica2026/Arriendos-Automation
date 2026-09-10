@@ -670,11 +670,19 @@ class LeaseAccountingPipeline:
 
         missing_nit_rows = invoices[invoices["supplier_nit"].isna()]
         if table_input and not missing_nit_rows.empty:
-            invoice_ids = ", ".join(missing_nit_rows["invoice_id"].dropna().map(str).head(10).tolist())
-            raise PipelineError(
-                "El invoices file contiene facturas sin NIT de proveedor: "
-                f"{invoice_ids or 'SIN_NUMERO'}. Completa la columna NIT antes de continuar."
-            )
+            for _, row in missing_nit_rows.iterrows():
+                invoice_id = self._clean_text(row.get("invoice_id")) or "SIN_NUMERO"
+                self.preflight_processing_issues.append({
+                    "invoice_id": invoice_id,
+                    "source_file": "invoices file",
+                    "store": self._clean_text(row.get("store")),
+                    "location": "invoices file",
+                    "problem": "La factura no tiene NIT de proveedor.",
+                    "possible_solution": "Completa la columna NIT en el archivo de facturas.",
+                    "issue_type": "missing_nit",
+                })
+            self._record_warning(f"Se omitieron {len(missing_nit_rows)} facturas del invoices file porque no tienen NIT.")
+            invoices = invoices.drop(index=missing_nit_rows.index).copy()
 
         invoice_supports = cleaned["invoice_supports"]
         if not invoice_supports.empty:
@@ -1284,12 +1292,44 @@ class LeaseAccountingPipeline:
     ) -> PipelineResult:
         pending_concepts = self.build_concept_review_items(output_df)
         if pending_concepts:
-            preview = ", ".join(item["description"] for item in pending_concepts[:5])
-            extra = "" if len(pending_concepts) <= 5 else f" y {len(pending_concepts) - 5} mas"
-            raise PipelineError(
-                "Hay items sin concepto aprendido en Diccionario_Conceptos_Simple.xlsx: "
-                f"{preview}{extra}. Asigna sus conceptos antes de generar los archivos."
-            )
+            bad_invoice_ids = set()
+            for _, row in output_df.iterrows():
+                for item in self._invoice_line_items(row.get("invoice_line_items")):
+                    description = self._clean_text(item.get("description"))
+                    amount = pd.to_numeric(pd.Series([item.get("amount")]), errors="coerce").iloc[0]
+                    if not description or pd.isna(amount) or abs(float(amount)) == 0:
+                        continue
+                    if not self._match_learning_dictionary(description, row):
+                        bad_invoice_ids.add(row.get("invoice_id"))
+
+            if bad_invoice_ids:
+                preview = ", ".join(item["description"] for item in pending_concepts[:5])
+                extra = "" if len(pending_concepts) <= 5 else f" y {len(pending_concepts) - 5} mas"
+                self._record_warning(
+                    f"Se omitieron {len(bad_invoice_ids)} facturas porque contienen conceptos no aprendidos "
+                    f"en el diccionario. Asigna sus conceptos para poder procesarlas: {preview}{extra}"
+                )
+                for inv_id in bad_invoice_ids:
+                    self.preflight_processing_issues.append({
+                        "invoice_id": str(inv_id),
+                        "source_file": "Diccionario",
+                        "store": None,
+                        "location": "Diccionario",
+                        "problem": "La factura contiene items sin concepto aprendido en Diccionario_Conceptos_Simple.xlsx.",
+                        "possible_solution": "Agrega las frases correspondientes al diccionario de conceptos.",
+                        "issue_type": "unmapped_concept",
+                    })
+                output_df = output_df[~output_df["invoice_id"].isin(bad_invoice_ids)].copy()
+
+        if not validation_df.empty and "invoice_id" in validation_df.columns:
+            invalid_invoice_ids = set(validation_df["invoice_id"].dropna())
+            if invalid_invoice_ids:
+                self._log(f"Skipping CSV generation for invoices with validation errors: {', '.join(map(str, invalid_invoice_ids))}")
+                output_df = output_df[~output_df["invoice_id"].isin(invalid_invoice_ids)].copy()
+
+        if output_df.empty:
+            raise PipelineError("Todas las facturas del lote fallaron la validacion o no tienen conceptos. Corrige los errores antes de generar los archivos.")
+
         self._log("Writing per-invoice Allocated Costs CSV ZIP and individual invoice ZIP bundles.")
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
         allocated_bundle_name = f"allocated_costs_csv_bundle_{timestamp}.zip"
