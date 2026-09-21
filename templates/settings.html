@@ -57,7 +57,11 @@
                 </label>
                 <label class="input-group">
                     <span class="input-label">GL Account</span>
-                    <input class="text-input-field" type="text" name="account" placeholder="Ej: 1532000000" required inputmode="numeric" maxlength="15">
+                    <input class="text-input-field" type="text" name="account" placeholder="Ej: 1532000000" required inputmode="numeric" maxlength="15" oninput="toggleSigla(this)">
+                </label>
+                <label class="input-group" style="max-width: 120px;">
+                    <span class="input-label">Sigla SAP</span>
+                    <input class="text-input-field" type="text" name="sigla" placeholder="Ej: RF" maxlength="30">
                 </label>
                 <button type="submit" class="compact-submit">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
@@ -77,6 +81,7 @@
                 <div class="settings-list-head" aria-hidden="true">
                     <span>Concepto</span>
                     <span>GL Account</span>
+                    <span>Sigla SAP</span>
                     <span>Aprendizaje</span>
                     <span>Acciones</span>
                 </div>
@@ -84,7 +89,8 @@
                     <form action="{{ url_for('settings') }}" method="post" class="settings-row">
                         <input type="hidden" name="original_concept" value="{{ item.concept }}">
                         <input class="text-input-field" type="text" name="concept" value="{{ item.concept }}" required maxlength="50" aria-label="Concepto">
-                        <input class="text-input-field" type="text" name="account" value="{{ item.account }}" required maxlength="15" aria-label="GL Account">
+                        <input class="text-input-field" type="text" name="account" value="{{ item.account }}" required maxlength="15" aria-label="GL Account" oninput="toggleSigla(this)">
+                        <input class="text-input-field" type="text" name="sigla" value="{{ item.sigla }}" maxlength="30" aria-label="Sigla SAP">
                         <span class="phrase-count">{{ item.phrase_count }} frase{{ '' if item.phrase_count == 1 else 's' }}</span>
                         <div class="settings-actions">
                             <button type="submit" name="action" value="update" class="icon-submit" title="Guardar cambios" aria-label="Guardar cambios de {{ item.concept }}">

@@ -2544,7 +2544,7 @@ button[type="submit"]:hover,
 
 .settings-add-form {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.8fr) auto;
+    grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.8fr) minmax(100px, 160px) auto;
     gap: 12px;
     align-items: end;
 }
@@ -2571,7 +2571,7 @@ button[type="submit"].compact-submit {
 .settings-list-head,
 .settings-row {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.65fr) 110px 96px;
+    grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.65fr) minmax(100px, 160px) 110px 96px;
     gap: 12px;
     align-items: center;
 }
