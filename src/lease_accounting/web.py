@@ -570,9 +570,10 @@ def _dictionary_sheet(workbook):
     concept_col = headers.get("concepto")
     account_col = headers.get("gl account") or headers.get("gl_account") or headers.get("cuenta")
     phrases_col = headers.get("frases/palabras") or headers.get("frases") or headers.get("palabras")
-    if not concept_col or not account_col or not phrases_col:
-        raise PipelineError("El diccionario debe tener columnas 'Concepto', 'GL Account' y 'Frases/palabras'.")
-    return sheet, concept_col, account_col, phrases_col
+    sigla_col = headers.get("sigla") or headers.get("texto_corto_lucy") or headers.get("texto")
+    if not concept_col or not account_col or not phrases_col or not sigla_col:
+        raise PipelineError("El diccionario debe tener columnas 'Concepto', 'GL Account', 'Frases/palabras' y 'Sigla'.")
+    return sheet, concept_col, account_col, phrases_col, sigla_col
 
 
 def _load_dictionary_workbook():
@@ -608,21 +609,22 @@ def _backup_learning_dictionary() -> Path:
     return backup_path
 
 
-def _validate_concept_account(concept: str, account: str) -> tuple[str, str]:
+def _validate_concept_account(concept: str, account: str, sigla: str) -> tuple[str, str, str]:
     concept = re.sub(r"\s+", " ", concept).strip().upper()
     account = re.sub(r"\s+", "_", account).strip().upper()
+    sigla = re.sub(r"\s+", " ", sigla).strip().upper() if sigla else ""
     if not concept or not account:
         raise PipelineError("El concepto y el GL Account son obligatorios.")
     if account != "SEGUN_CONTRATO" and not re.fullmatch(r"\d{6,15}", account):
         raise PipelineError("El GL Account debe contener entre 6 y 15 digitos, o usar SEGUN_CONTRATO para RENTA.")
-    return concept, account
+    return concept, account, sigla
 
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     try:
         workbook = _load_dictionary_workbook()
-        sheet, concept_col, account_col, phrases_col = _dictionary_sheet(workbook)
+        sheet, concept_col, account_col, phrases_col, sigla_col = _dictionary_sheet(workbook)
 
         if request.method == "POST":
             action = request.form.get("action", "").strip().lower()
@@ -640,9 +642,10 @@ def settings():
                 sheet.delete_rows(row_idx, 1)
                 success_message = f"Concepto {original} eliminado correctamente."
             else:
-                concept, account = _validate_concept_account(
+                concept, account, sigla = _validate_concept_account(
                     request.form.get("concept", ""),
                     request.form.get("account", ""),
+                    request.form.get("sigla", ""),
                 )
 
             if action == "add":
@@ -651,6 +654,7 @@ def settings():
                 row_idx = sheet.max_row + 1
                 sheet.cell(row_idx, concept_col).value = concept
                 sheet.cell(row_idx, account_col).value = account
+                sheet.cell(row_idx, sigla_col).value = sigla
                 sheet.cell(row_idx, phrases_col).value = ""
                 success_message = f"Concepto {concept} agregado correctamente."
             elif action == "update":
@@ -663,6 +667,7 @@ def settings():
                     raise PipelineError(f"Ya existe otro concepto llamado {concept}.")
                 sheet.cell(row_idx, concept_col).value = concept
                 sheet.cell(row_idx, account_col).value = account
+                sheet.cell(row_idx, sigla_col).value = sigla
                 success_message = f"Concepto {concept} actualizado correctamente."
             elif action != "delete":
                 raise PipelineError("Accion de configuracion no valida.")
@@ -688,7 +693,8 @@ def settings():
                 {
                     "concept": concept,
                     "account": str(sheet.cell(row_idx, account_col).value or "").strip(),
-                    "phrase_count": len(phrases),
+                    "sigla": str(sheet.cell(row_idx, sigla_col).value or "").strip(),
+                        "phrase_count": len(phrases),
                 }
             )
         return render_template("settings.html", concepts=concepts)

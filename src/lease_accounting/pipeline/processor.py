@@ -1904,7 +1904,7 @@ class LeaseAccountingPipeline:
                     "concept": ["concepto"],
                     "account": ["gl_account", "gl account", "cuenta", "cuenta_contable"],
                     "phrases": ["frases_palabras", "frases/palabras", "frase_palabra", "palabras", "frases"],
-                    "text": ["texto_corto_lucy", "texto corto lucy", "texto", "text"],
+                    "text": ["texto_corto_lucy", "texto corto lucy", "texto", "text", "sigla"],
                 },
             )
         )
@@ -4008,18 +4008,19 @@ class LeaseAccountingPipeline:
         for _, rule in self.learning_dictionary.iterrows():
             concept = self._clean_text(rule.get("concept"))
             account = self._clean_text(rule.get("account"))
+            sigla = self._clean_text(rule.get("text"))
             phrases = self._split_dictionary_phrases(rule.get("phrases"))
             if not concept or not phrases:
                 continue
             for phrase in phrases:
                 phrase_key = self._concept_key(normalize_learning_phrase(phrase))
                 if phrase_key and phrase_key in description_key:
-                    candidates.append((len(phrase_key), concept, account, phrase_key))
+                    candidates.append((len(phrase_key), concept, account, phrase_key, sigla))
 
         if not candidates:
             return None
 
-        _, concept, account, _ = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+        _, concept, account, _, sigla = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
         if account == "SEGUN CONTRATO" or account == "SEGUN_CONTRATO" or concept == "RENTA":
             account = self._clean_numeric_code(row.get("account")) or self.VARIABLE_ACCOUNT
             concept = self._resolve_account_concept(account, row.get("rent_type"))
@@ -4027,6 +4028,7 @@ class LeaseAccountingPipeline:
             return None
         else:
             account = self._clean_numeric_code(account) or account
+            concept = sigla if sigla else concept
         return concept, account
 
     def _split_dictionary_phrases(self, value) -> list[str]:

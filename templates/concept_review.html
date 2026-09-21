@@ -82,10 +82,10 @@
                                         {% endfor %}
                                     </td>
                                     <td style="vertical-align: top; padding: 10px; border-top: 1px solid var(--border); min-width: 180px;">
-                                        <select name="concept_{{ idx }}" required class="text-input-field">
+                                        <select name="concept_{{ idx }}" required class="text-input-field concept-select" data-description="{{ item.description }}">
                                             <option value="">Seleccionar...</option>
                                             {% for concept in concepts %}
-                                                <option value="{{ concept.concept }}">{{ concept.concept }}{% if concept.account %} · {{ concept.account }}{% endif %}</option>
+                                                <option value="{{ concept.concept }}|{{ concept.account }}" {% if item.predicted_account == concept.account %}selected{% endif %}>{{ concept.concept }}{% if concept.account %} &middot; {{ concept.account }}{% endif %}</option>
                                             {% endfor %}
                                         </select>
                                     </td>
@@ -114,6 +114,28 @@
             </section>
         </form>
     </main>
+
+    <!-- Custom Confirmation Modal -->
+    <div class="processing-issues-modal" id="logicalWarningModal" role="dialog" aria-modal="true" style="display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center;">
+        <div class="manual-modal-backdrop" style="position: absolute; inset: 0; background: rgba(0,0,0,0.7);"></div>
+        <section class="processing-issues-dialog" tabindex="-1" style="position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <header class="processing-issues-header" style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 24px;">
+                <div class="manual-modal-icon" aria-hidden="true" style="color: #ff9800; background: rgba(255,152,0,0.1); padding: 12px; border-radius: 50%;">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/></svg>
+                </div>
+                <div>
+                    <p class="manual-modal-eyebrow" style="color: #ff9800; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px 0;">Aviso Lógico</p>
+                    <h2 style="margin: 0 0 12px 0; font-size: 1.25rem;">Incongruencia detectada</h2>
+                    <p id="logicalWarningDesc" style="color: var(--text-secondary); line-height: 1.5; margin: 0;"></p>
+                </div>
+            </header>
+            <div class="processing-issues-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button type="button" id="logicalWarningCancel" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer;">Cancelar</button>
+                <button type="button" class="manual-modal-confirm" id="logicalWarningConfirm" style="background: #ff9800; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">Sí, estoy seguro</button>
+            </div>
+        </section>
+    </div>
+
     <script>
         function normalizeTag(value) {
             return value.replace(/\s+/g, ' ').trim();
@@ -200,6 +222,74 @@
             btn.classList.add('loading');
             btn.querySelector('span').textContent = 'Guardando y procesando...';
             btn.style.pointerEvents = 'none';
+        });
+
+        // Soft Warnings logic
+        const logicalModal = document.getElementById('logicalWarningModal');
+        const logicalDesc = document.getElementById('logicalWarningDesc');
+        const logicalConfirm = document.getElementById('logicalWarningConfirm');
+        const logicalCancel = document.getElementById('logicalWarningCancel');
+        
+        let pendingSelect = null;
+        let pendingPrevValue = '';
+
+        logicalCancel.addEventListener('click', () => {
+            if (pendingSelect) pendingSelect.value = pendingPrevValue;
+            logicalModal.style.display = 'none';
+        });
+
+        logicalConfirm.addEventListener('click', () => {
+            logicalModal.style.display = 'none';
+        });
+
+        document.querySelectorAll('.concept-select').forEach((select) => {
+            // Save initial value before change
+            select.addEventListener('focus', function() {
+                this.dataset.prevValue = this.value;
+            });
+            
+            select.addEventListener('change', (e) => {
+                if (!select.value) return;
+                
+                const desc = select.dataset.description.toUpperCase();
+                const selectedText = select.options[select.selectedIndex].text.toUpperCase();
+                
+                let isMismatch = false;
+                
+                // Regla 1: Mantenimiento vs Otros
+                if (desc.includes('MANTENIMIENTO') || desc.includes('MTTO') || desc.includes('MANTTO')) {
+                    if (selectedText.includes('ENERGIA') || selectedText.includes('ACUED') || selectedText.includes('AGUA') || selectedText.includes('ARRIENDO') || selectedText.includes('RENTA')) {
+                        isMismatch = true;
+                    }
+                }
+                // Regla 2: Agua/Acueducto vs Mantenimiento
+                if (desc.includes('AGUA') || desc.includes('ACUEDUCTO') || desc.includes('ALCANTARILLADO') || desc.includes('WATER') || desc.includes('SEWER')) {
+                    if (selectedText.includes('MANTENIMIENTO') || selectedText.includes('MTTO') || selectedText.includes('RENTA') || selectedText.includes('ENERGIA')) {
+                        isMismatch = true;
+                    }
+                }
+                // Regla 3: Espacio/Arriendo vs Energia/Acueducto
+                if (desc.includes('ESPACIO') || desc.includes('ARRIENDO') || desc.includes('LOCAL') || desc.includes('CONCESION') || desc.includes('RENTA')) {
+                    if (selectedText.includes('ENERGIA') || selectedText.includes('ACUED') || selectedText.includes('AGUA') || selectedText.includes('MANTENIMIENTO') || selectedText.includes('MTTO')) {
+                        isMismatch = true;
+                    }
+                }
+                // Regla 4: Energia vs Otros
+                if (desc.includes('ENERGIA') || desc.includes('LUZ') || desc.includes('ELECT')) {
+                    if (selectedText.includes('ARRIENDO') || selectedText.includes('ACUED') || selectedText.includes('AGUA') || selectedText.includes('MANTENIMIENTO') || selectedText.includes('RENTA')) {
+                        isMismatch = true;
+                    }
+                }
+                
+                if (isMismatch) {
+                    pendingSelect = select;
+                    pendingPrevValue = select.dataset.prevValue || '';
+                    logicalDesc.innerHTML = `La factura indica: <strong>"${select.dataset.description}"</strong><br><br>Pero has elegido: <strong>"${selectedText}"</strong><br><br>¿Estás absolutamente seguro de que deseas guardar este concepto en esa cuenta?`;
+                    logicalModal.style.display = 'flex';
+                } else {
+                    select.dataset.prevValue = select.value;
+                }
+            });
         });
     </script>
 </body>
