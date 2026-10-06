@@ -511,6 +511,7 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
     sheet = workbook["Diccionario"]
     headers = {str(cell.value or "").strip().lower(): idx for idx, cell in enumerate(sheet[1], start=1)}
     concept_col = headers.get("concepto")
+    account_col = headers.get("gl account") or headers.get("gl_account") or headers.get("cuenta")
     phrases_col = headers.get("frases/palabras") or headers.get("frases") or headers.get("palabras")
     if not concept_col or not phrases_col:
         raise PipelineError("El diccionario debe tener columnas 'Concepto' y 'Frases/palabras'.")
@@ -522,15 +523,23 @@ def _append_learning_dictionary_phrases(assignments: list[dict]) -> None:
             concept_rows[concept.upper()] = row_idx
 
     for assignment in assignments:
-        concept = (assignment.get("concept") or "").strip()
+        selection = (assignment.get("concept") or "").strip()
+        concept, separator, selected_account = selection.partition("|")
+        concept = concept.strip()
+        selected_account = selected_account.strip()
         phrase_text = (assignment.get("phrase") or "").strip()
         if not concept or not phrase_text:
-            continue
+            raise PipelineError("Todos los items pendientes necesitan concepto y frase/palabra.")
         row_idx = concept_rows.get(concept.upper())
         if not row_idx:
-            row_idx = sheet.max_row + 1
-            sheet.cell(row_idx, concept_col).value = concept
-            concept_rows[concept.upper()] = row_idx
+            raise PipelineError(f"El concepto seleccionado no existe en el diccionario: {concept}.")
+        if separator:
+            actual_account = str(sheet.cell(row_idx, account_col).value or "").strip() if account_col else ""
+            if not selected_account or selected_account != actual_account:
+                raise PipelineError(
+                    f"La cuenta seleccionada para {concept} no coincide con el diccionario. "
+                    "Recarga la revision de conceptos y vuelve a seleccionar."
+                )
         current = str(sheet.cell(row_idx, phrases_col).value or "").strip()
         existing = []
         existing_keys = set()

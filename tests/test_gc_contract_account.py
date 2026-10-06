@@ -74,6 +74,40 @@ class GcContractAccountTests(unittest.TestCase):
                 self.assertEqual(concept, "GC VARIABLE")
                 self.assertEqual(account, self.gc_variable_account)
 
+    def test_gc_v_alias_keeps_dynamic_sell_media_rule(self):
+        self.pipeline.learning_dictionary.at[0, "concept"] = "GC V"
+        self.pipeline.learning_dictionary.at[0, "text"] = "GC V"
+        for sell_media, expected in [
+            (0, ("GC VARIABLE", self.gc_variable_account)),
+            (1000, ("GC", self.fixed_account)),
+        ]:
+            with self.subTest(sell_media=sell_media):
+                self.assertEqual(
+                    self.pipeline._item_line_classification(
+                        self.item, {"sell_media": sell_media},
+                    ),
+                    expected,
+                )
+
+    def test_shared_account_preserves_distinct_abbreviations(self):
+        self.pipeline.learning_dictionary = pd.DataFrame([
+            {"concept": "AIRE", "account": "1532001600", "phrases": "AIRE ACONDICIONADO", "text": "AIRE"},
+            {"concept": "ASEO", "account": "1532001600", "phrases": "REINTEGRO DE ASEO", "text": "ASEO"},
+            {"concept": "VIGILANCIA", "account": "1532001600", "phrases": "VIGILANCIA", "text": "VIGILANCIA"},
+            {"concept": "FP", "account": "1537210003", "phrases": "FONDO DE PROMOCION", "text": "FP"},
+            {"concept": "GC OFICINA", "account": "1535100020", "phrases": "COMMON AREA MAINTENANCE", "text": "GC OFICINA"},
+            {"concept": "RF OFICINA", "account": "1535100000", "phrases": "ARRIENDOS INMUEBLES", "text": "RF OFICINA"},
+        ])
+        for _, rule in self.pipeline.learning_dictionary.iterrows():
+            with self.subTest(concept=rule["concept"]):
+                self.assertEqual(
+                    self.pipeline._item_line_classification(
+                        {"description": rule["phrases"], "amount": 100},
+                        {"sell_media": 0},
+                    ),
+                    (rule["text"], rule["account"]),
+                )
+
     def test_allocated_cost_text_uses_gc_variable(self):
         output_df = pd.DataFrame(
             [
