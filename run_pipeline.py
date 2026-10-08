@@ -115,6 +115,8 @@ def main():
         print(f"  - CSV de cabeceras: {result.get('header_csv')}")
         print(f"  - Reporte de validaciones: {result.get('validation_excel')}")
         print(f"  - Insumos normalizados: {result.get('normalized_invoices_excel')}")
+        print(f"  - Control JSON del bot: {result.get('bot_control_json')}")
+        print(f"  - Paquete del bot (solo JSON y Allocated Costs): {result.get('bot_control_bundle')}")
         
         print("\nLogs detallados del procesamiento:")
         for log_line in result.get("logs", []):

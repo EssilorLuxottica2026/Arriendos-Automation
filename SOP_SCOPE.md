@@ -23,6 +23,8 @@ The app covers the logic before manual posting in Lucy/SAP:
 - Splits invoices by distribution rules when required
 - Generates standardized accounting text
 - Produces a single consolidated output file for downstream operation
+- Saves per-run JSON invoice control linking supports and invoice CSVs;
+  the portable single-vendor bot bundle contains only JSON and allocated costs
 
 ## What the app does not do
 
@@ -44,3 +46,7 @@ The output file is the single downstream input for operational use:
 Target output:
 
 - `output_lucy_ready.xlsx`
+
+The current runtime also exports per-invoice CSV ZIPs and
+`control_facturas_bot.json`. The JSON confirms preparation only; Lucy/SAP
+execution and compensation remain outside the automated scope.
