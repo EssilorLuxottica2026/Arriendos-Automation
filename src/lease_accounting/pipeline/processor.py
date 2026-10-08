@@ -1154,6 +1154,15 @@ class LeaseAccountingPipeline:
         df["contract_status_blocked"] = df["status_en_rem"].map(self._is_blocked_contract_status)
         df["rent_type"] = np.where(df["contract_active"], "RF", "RV")
         df["account"] = np.where(df["contract_active"], self.FIXED_ACCOUNT, self.VARIABLE_ACCOUNT)
+        office_mask = df["store"].map(self._is_office_store)
+        if office_mask.any():
+            office_rent_account = self._office_account_for_concept("RF")
+            if not office_rent_account:
+                raise PipelineError(
+                    "Falta la cuenta de arriendos para Oficina en Diccionario_Conceptos_Simple.xlsx "
+                    "(concepto RF OFICINA)."
+                )
+            df.loc[office_mask, "account"] = office_rent_account
         df["gross_amount"] = pd.to_numeric(df["amount"], errors="coerce").map(
             lambda value: round_cop(value, 0)
         )
@@ -1213,8 +1222,8 @@ class LeaseAccountingPipeline:
 
         period_dates = self._resolve_period(df["invoice_date"], period)
         df["concept"] = [
-            self._resolve_account_concept(account, rent_type)
-            for account, rent_type in zip(df["account"], df["rent_type"])
+            rent_type if self._is_office_store(store) else self._resolve_account_concept(account, rent_type)
+            for account, rent_type, store in zip(df["account"], df["rent_type"], df["store"])
         ]
         df["text"] = [
             self._build_text(date_value, concept, store, ceco)
@@ -3893,7 +3902,10 @@ class LeaseAccountingPipeline:
         description = self._clean_text(item.get("description"))
         dictionary_match = self._match_learning_dictionary(description, row)
         if dictionary_match:
-            return self._resolve_gc_item_classification(*dictionary_match, row)
+            concept, account = self._resolve_gc_item_classification(*dictionary_match, row)
+            if self._is_office_store(row.get("store")) or self._is_office_store(row.get("mapped_store")):
+                account = self._office_account_for_concept(concept) or account
+            return concept, account
         return "SIN CLASIFICAR", ""
 
     def _resolve_gc_item_classification(self, concept: str, account: str, row) -> tuple[str, str]:
@@ -3924,11 +3936,14 @@ class LeaseAccountingPipeline:
         if not description_key or self.learning_dictionary.empty:
             return None
 
+        is_office_invoice = self._is_office_store(row.get("store")) or self._is_office_store(row.get("mapped_store"))
         candidates = []
         for _, rule in self.learning_dictionary.iterrows():
             concept = self._clean_text(rule.get("concept"))
             account = self._clean_text(rule.get("account"))
             sigla = self._clean_text(rule.get("text"))
+            if self._is_office_dictionary_concept(concept) and not is_office_invoice:
+                continue
             phrases = self._split_dictionary_phrases(rule.get("phrases"))
             if not concept or not phrases:
                 continue
@@ -3941,15 +3956,80 @@ class LeaseAccountingPipeline:
             return None
 
         _, concept, account, _, sigla = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+        if self._is_office_dictionary_concept(concept):
+            office_concept = self._concept_key(concept)
+            if office_concept == "RF OFICINA":
+                concept = self._clean_text(row.get("rent_type")) or "RV"
+            else:
+                concept = sigla or self._office_concept_counterpart(concept)
+            account = self._clean_numeric_code(account) or account
+            return concept, account
+
         if account == "SEGUN CONTRATO" or account == "SEGUN_CONTRATO" or concept == "RENTA":
             account = self._clean_numeric_code(row.get("account")) or self.VARIABLE_ACCOUNT
             concept = self._resolve_account_concept(account, row.get("rent_type"))
+            if is_office_invoice:
+                concept = self._clean_text(row.get("rent_type")) or concept
+                account = self._office_account_for_concept("RF") or account
         elif not account:
             return None
         else:
             account = self._clean_numeric_code(account) or account
             concept = sigla if sigla else concept
         return concept, account
+
+    def _is_office_store(self, value) -> bool:
+        return "OFICINA" in self._concept_key(value)
+
+    def _is_office_dictionary_concept(self, concept: str | None) -> bool:
+        return " OFICINA" in f" {self._concept_key(concept)}"
+
+    def _office_concept_counterpart(self, concept: str | None) -> str:
+        concept_key = self._concept_key(concept)
+        if concept_key == "GC OFICINA":
+            return "GC V"
+        if concept_key == "ACUED OFICINA":
+            return "ACUED"
+        if concept_key == "ENERGIA OFICINA":
+            return "ENERGIA"
+        if concept_key == "RF OFICINA":
+            return "RENTA"
+        return self._clean_text(concept) or ""
+
+    def _office_account_for_concept(self, concept: str | None) -> str | None:
+        concept_key = self._concept_key(concept)
+        if concept_key in {"RF", "RV", "RENTA", "RF OFICINA"}:
+            office_concept = "RF OFICINA"
+        elif concept_key in {"ENERGIA", "ENERGIA OFICINA"}:
+            office_concept = "ENERGIA OFICINA"
+        elif concept_key in {"ACUED", "ACUED OFICINA"}:
+            office_concept = "ACUED OFICINA"
+        elif concept_key in {"GC", "GC V", "GC VARIABLE", "GV", "GF", "GC OFICINA"}:
+            office_concept = "GC OFICINA"
+        else:
+            return None
+
+        if self.learning_dictionary.empty:
+            raise PipelineError(
+                f"Falta el concepto {office_concept} en Diccionario_Conceptos_Simple.xlsx."
+            )
+        matches = self.learning_dictionary[
+            self.learning_dictionary["concept"].map(self._concept_key).eq(office_concept)
+        ]
+        accounts = {
+            account
+            for account in matches["account"].map(self._clean_numeric_code)
+            if account
+        }
+        if len(accounts) > 1:
+            raise PipelineError(
+                f"El concepto {office_concept} tiene mas de una cuenta en Diccionario_Conceptos_Simple.xlsx."
+            )
+        if not accounts:
+            raise PipelineError(
+                f"Falta la cuenta para {office_concept} en Diccionario_Conceptos_Simple.xlsx."
+            )
+        return next(iter(accounts))
 
     def _split_dictionary_phrases(self, value) -> list[str]:
         text = self._clean_text(value)

@@ -175,17 +175,26 @@ class GcContractAccountTests(unittest.TestCase):
             {"concept": "ASEO", "account": "1532001600", "phrases": "REINTEGRO DE ASEO", "text": "ASEO"},
             {"concept": "VIGILANCIA", "account": "1532001600", "phrases": "VIGILANCIA", "text": "VIGILANCIA"},
             {"concept": "FP", "account": "1537210003", "phrases": "FONDO DE PROMOCION", "text": "FP"},
-            {"concept": "GC OFICINA", "account": "1535100020", "phrases": "COMMON AREA MAINTENANCE", "text": "GC OFICINA"},
-            {"concept": "RF OFICINA", "account": "1535100000", "phrases": "ARRIENDOS INMUEBLES", "text": "RF OFICINA"},
+            {"concept": "GC OFICINA", "account": "1535100020", "phrases": "COMMON AREA MAINTENANCE", "text": "GC V"},
+            {"concept": "RF OFICINA", "account": "1535100000", "phrases": "ARRIENDOS INMUEBLES", "text": "RENTA"},
         ])
         for _, rule in self.pipeline.learning_dictionary.iterrows():
             with self.subTest(concept=rule["concept"]):
+                office_rule = "OFICINA" in rule["concept"]
+                expected = {
+                    "GC OFICINA": ("GV", rule["account"]),
+                    "RF OFICINA": ("RV", rule["account"]),
+                }.get(rule["concept"], (rule["text"], rule["account"]))
                 self.assertEqual(
                     self.pipeline._item_line_classification(
                         {"description": rule["phrases"], "amount": 100},
-                        {"sell_media": 0},
+                        {
+                            "sell_media": 0,
+                            "rent_type": "RV",
+                            "store": "OFICINA" if office_rule else "T001",
+                        },
                     ),
-                    (rule["text"], rule["account"]),
+                    expected,
                 )
 
     def test_allocated_cost_text_uses_gc_variable(self):
