@@ -102,6 +102,16 @@
                     </div>
                 </div>{% endif %}
 
+                <!-- BOT LUCY -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Bot Lucy</div>
+                        <div class="download-desc">Ejecuta el bot Lucy con los resultados procesados.</div>
+                        <div id="bot-lucy-status" class="download-desc" role="status"></div>
+                    </div>
+                    <button type="button" id="run-bot-lucy" class="button-link primary" style="cursor: pointer; font-family: inherit;">Bot Lucy</button>
+                </div>
+
             </div>
         </section>
         {% endif %}
@@ -145,5 +155,49 @@
             </div>
         </section>
     </main>
+    <script>
+        (function () {
+            var button = document.getElementById("run-bot-lucy");
+            var statusEl = document.getElementById("bot-lucy-status");
+            if (!button) { return; }
+            var timer = null;
+
+            function setState(running, message) {
+                button.disabled = running;
+                button.style.opacity = running ? "0.6" : "";
+                statusEl.textContent = message || "";
+            }
+
+            function poll() {
+                fetch("{{ url_for('bot_lucy_status') }}")
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.status === "running") { return; }
+                        clearInterval(timer);
+                        if (data.status === "error") {
+                            setState(false, "Error: " + data.message);
+                        } else {
+                            setState(false, "Bot Lucy finalizó.");
+                        }
+                    })
+                    .catch(function () { clearInterval(timer); setState(false, "No se pudo consultar el estado del bot."); });
+            }
+
+            button.addEventListener("click", function () {
+                setState(true, "Iniciando Bot Lucy...");
+                fetch("{{ url_for('run_bot_lucy') }}", { method: "POST" })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                    .then(function (res) {
+                        if (!res.ok && res.data.status !== "running") {
+                            setState(false, res.data.message || "No se pudo iniciar el bot.");
+                            return;
+                        }
+                        setState(true, "Bot Lucy en ejecución...");
+                        timer = setInterval(poll, 2000);
+                    })
+                    .catch(function () { setState(false, "No se pudo iniciar el bot."); });
+            });
+        })();
+    </script>
 </body>
 </html>

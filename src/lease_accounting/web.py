@@ -1,14 +1,17 @@
 from pathlib import Path
 from uuid import uuid4
+import importlib.util
 import json
 import re
 import shutil
+import threading
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -1004,3 +1007,43 @@ def download(filename: str):
         flash("Requested file does not exist.")
         return redirect(url_for("index"))
     return send_file(file_path, as_attachment=True)
+
+
+BOT_LUCY_SCRIPT = BASE_DIR / "bot-process" / "bot_lucy.py"
+_bot_lucy_state = {"running": False, "error": None}
+_bot_lucy_lock = threading.Lock()
+
+
+def _run_bot_lucy_job() -> None:
+    try:
+        spec = importlib.util.spec_from_file_location("bot_lucy", BOT_LUCY_SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.main()
+        _bot_lucy_state["error"] = None
+    except Exception as exc:  # noqa: BLE001
+        _bot_lucy_state["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        _bot_lucy_state["running"] = False
+
+
+@app.route("/run-bot-lucy", methods=["POST"])
+def run_bot_lucy():
+    if not BOT_LUCY_SCRIPT.exists():
+        return jsonify(status="error", message="No se encontró bot-process/bot_lucy.py."), 404
+    with _bot_lucy_lock:
+        if _bot_lucy_state["running"]:
+            return jsonify(status="running", message="El Bot Lucy ya está en ejecución."), 409
+        _bot_lucy_state.update(running=True, error=None)
+    threading.Thread(target=_run_bot_lucy_job, daemon=True).start()
+    return jsonify(status="started", message="Bot Lucy iniciado."), 202
+
+
+@app.route("/bot-lucy-status", methods=["GET"])
+def bot_lucy_status():
+    if _bot_lucy_state["running"]:
+        return jsonify(status="running")
+    if _bot_lucy_state["error"]:
+        return jsonify(status="error", message=_bot_lucy_state["error"])
+    return jsonify(status="idle")
+
