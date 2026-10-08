@@ -321,6 +321,8 @@ class LeaseAccountingPipeline:
     def _configure_account_reference(self) -> None:
         self.FIXED_ACCOUNT = self._account_code_for_concept("RF")
         self.VARIABLE_ACCOUNT = self._account_code_for_concept("RV")
+        self.ADMIN_SELL_CAM_ACCOUNT = self._account_code_for_description("ADMINISTRACION SELL CAM")
+        self.ADMIN_VARIABLE_ACCOUNT = self._account_code_for_description("ADMINISTRACION VARIABLE")
         self.VAT_ACCOUNT = (
             self._account_code_for_concept("IVA")
             or self._account_code_for_concept("VAT")
@@ -454,6 +456,20 @@ class LeaseAccountingPipeline:
             if self._concept_key(mapped_concept) == target:
                 return account_code
         return None
+
+    def _account_code_for_description(self, description: str | None) -> str | None:
+        target = self._concept_key(description)
+        if not target or self.account_reference.empty:
+            return None
+        matches = self.account_reference[
+            self.account_reference["description"].map(self._concept_key).eq(target)
+        ]
+        accounts = matches["account"].dropna().astype(str).unique()
+        if len(accounts) > 1:
+            raise PipelineError(
+                f"La descripción de cuenta '{description}' está asociada a más de una cuenta contable."
+            )
+        return accounts[0] if len(accounts) == 1 else None
 
     def run(
         self,
@@ -842,6 +858,9 @@ class LeaseAccountingPipeline:
         contracts["end_of_term"] = pd.to_datetime(contracts["end_of_term"], errors="coerce")
         contracts["rent_min"] = pd.to_numeric(contracts["rent_min"], errors="coerce").fillna(0)
         contracts["sell_media"] = pd.to_numeric(contracts["sell_media"], errors="coerce").fillna(0)
+        if "sell_cam" not in contracts.columns:
+            contracts["sell_cam"] = 0
+        contracts["sell_cam"] = pd.to_numeric(contracts["sell_cam"], errors="coerce").fillna(0)
 
         prorateo = cleaned["prorateo"]
         if "vendor_code" not in prorateo.columns:
@@ -961,6 +980,8 @@ class LeaseAccountingPipeline:
         invoices = data["invoices"].copy()
         control = data["control"]
         contracts = data["contracts"].copy()
+        if "sell_cam" not in contracts.columns:
+            contracts["sell_cam"] = 0
         macro_database = data.get("macro_database", pd.DataFrame())
 
         vendor_map = control.drop_duplicates(subset=["vendor_key"])[["vendor_key", "store", "ceco", "vendor_code"]].rename(
@@ -1082,7 +1103,7 @@ class LeaseAccountingPipeline:
         )
 
         merged = merged.merge(
-            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "status_en_rem"]],
+            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "sell_cam", "status_en_rem"]],
             left_on="mapped_ceco_key",
             right_on="ceco_key",
             how="left",
@@ -1114,7 +1135,8 @@ class LeaseAccountingPipeline:
                 f"Store={row['store']} (Mapped Store={row['mapped_store']}), "
                 f"CECO={row['ceco']} (Mapped CECO={row['mapped_ceco']}), "
                 f"Contract End={row['end_of_term']} (Rent Min={row['rent_min']}, "
-                f"Sell Media={row['sell_media']}, Status={row['status_en_rem']}), "
+                f"Sell Media={row['sell_media']}, Sell CAM={row['sell_cam']}, "
+                f"Status={row['status_en_rem']}), "
                 f"Prorateo VW%={row['vw_percent']}, VQ%={row['vq_percent']} "
                 f"(Source={row['prorateo_source']}), Profit Center={row['profit_center']}"
             )
@@ -1223,6 +1245,7 @@ class LeaseAccountingPipeline:
                 "concept",
                 "rent_type",
                 "sell_media",
+                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -1672,6 +1695,7 @@ class LeaseAccountingPipeline:
                         "end_of_term": ["end_of_term", "end_of_term_en_virtual_contract"],
                         "rent_min": ["rent_min_rent", "rent_min"],
                         "sell_media": ["sell_media"],
+                        "sell_cam": ["sell_cam"],
                         "status_en_rem": ["status_en_rem"],
                     },
                 )
@@ -1692,6 +1716,7 @@ class LeaseAccountingPipeline:
                 "end_of_term",
                 "rent_min",
                 "sell_media",
+                "sell_cam",
                 "status_en_rem",
                 "country_sheet",
                 "source_row",
@@ -2844,6 +2869,8 @@ class LeaseAccountingPipeline:
         ]:
             if col in summary_df.columns:
                 summary_df[col] = pd.to_numeric(summary_df[col], errors="coerce").map(round_cop)
+        if "sell_cam" not in summary_df.columns:
+            summary_df["sell_cam"] = 0
         summary_df["invoice_date"] = pd.to_datetime(summary_df["invoice_date"], errors="coerce")
         summary_df["posting_key"] = summary_df["invoice_id"].fillna("") + "|" + summary_df["vendor"].fillna("")
         summary_df["posting_index"] = summary_df.groupby("invoice_id").cumcount() + 1
@@ -2943,6 +2970,8 @@ class LeaseAccountingPipeline:
                     continue
                 item_concept, item_account = self._item_line_classification(item, row)
                 item_text = self._build_text(row["invoice_date"], item_concept, row["store"], row["ceco"])
+                credit_note = bool(row.get("is_credit_note", False))
+                item_amount = -abs(float(item_amount)) if credit_note else abs(float(item_amount))
                 item_rows.append(
                     {
                         **base,
@@ -2978,7 +3007,7 @@ class LeaseAccountingPipeline:
             ).iloc[0]
             if pd.notna(posting_discount_total) and float(posting_discount_total) > 0:
                 allocations = self._allocate_proportionally(
-                    [expense_row.get("amount") for expense_row in expense_rows],
+                    [abs(float(expense_row.get("amount") or 0)) for expense_row in expense_rows],
                     float(posting_discount_total),
                 )
                 discount_text = self._build_text(
@@ -3091,6 +3120,7 @@ class LeaseAccountingPipeline:
                 "account",
                 "concept",
                 "rent_type",
+                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -3867,12 +3897,27 @@ class LeaseAccountingPipeline:
         return "SIN CLASIFICAR", ""
 
     def _resolve_gc_item_classification(self, concept: str, account: str, row) -> tuple[str, str]:
-        if self._concept_key(concept) not in {"GC", "GC V", "GC VARIABLE"}:
+        normalized_concept = self._concept_key(concept)
+        if normalized_concept == "GC V":
+            sell_cam = pd.to_numeric(pd.Series([row.get("sell_cam")]), errors="coerce").iloc[0]
+            if pd.notna(sell_cam) and float(sell_cam) > 0:
+                return "GF", (
+                    self.ADMIN_SELL_CAM_ACCOUNT
+                    or self.FIXED_ACCOUNT
+                    or account
+                )
+            return "GV", (
+                self.ADMIN_VARIABLE_ACCOUNT
+                or self._account_code_for_concept("GC VARIABLE")
+                or self._account_code_for_concept("GC")
+                or account
+            )
+        if normalized_concept not in {"GC", "GC VARIABLE"}:
             return concept, account
         sell_media = pd.to_numeric(pd.Series([row.get("sell_media")]), errors="coerce").iloc[0]
         if pd.notna(sell_media) and float(sell_media) > 0:
             return "GC", self.FIXED_ACCOUNT
-        return "GC VARIABLE", self._account_code_for_concept("GC VARIABLE") or self._account_code_for_concept("GC")
+        return "GC V", self._account_code_for_concept("GC VARIABLE") or self._account_code_for_concept("GC")
 
     def _match_learning_dictionary(self, description: str | None, row) -> tuple[str, str] | None:
         description_key = self._concept_key(normalize_learning_phrase(description))
