@@ -70,5 +70,29 @@
             <button type="submit" class="manual-modal-confirm">Confirmar contratos y continuar</button>
         </form>
     </div>
+
+    <script>
+        (function () {
+            document.querySelectorAll('form').forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (form.dataset.submitting === '1') {
+                        event.preventDefault();
+                        return;
+                    }
+                    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+                        return;
+                    }
+                    form.dataset.submitting = '1';
+                    form.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+                        btn.disabled = true;
+                        if (!btn.dataset.originalLabel) {
+                            btn.dataset.originalLabel = btn.textContent;
+                        }
+                        btn.textContent = 'Procesando...';
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

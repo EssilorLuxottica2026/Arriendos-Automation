@@ -3,7 +3,6 @@ import logging
 import re
 import unicodedata
 import zipfile
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -28,7 +27,8 @@ LEARNING_MONTH_PATTERN = (
 
 
 def normalize_learning_phrase(value) -> str:
-    """Remove invoice-period tokens so learned phrases remain reusable."""
+    """Remove invoice-period tokens and per-invoice numeric readings so learned
+    phrases remain reusable across months."""
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     if not text:
         return ""
@@ -40,6 +40,13 @@ def normalize_learning_phrase(value) -> str:
     text = re.sub(rf"\b(?:{LEARNING_MONTH_PATTERN})\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\b20\d{2}\b", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\b(?:MES|PER[IÍ]ODO|A[NÑ]O)\b", " ", text, flags=re.IGNORECASE)
+
+    text = re.sub(r"\b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\b", " ", text)
+    text = re.sub(r"\b\d+[.,]\d+\b", " ", text)
+    text = re.sub(r"\b\d{3,}\b", " ", text)
+    text = re.sub(r"\b(FACTOR|CONSUMO|CONTADOR)\s+\d+\b", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(LECTURA\s+(?:ANT|ACT)[\.\:]?)\s*\d*\b", r"\1", text, flags=re.IGNORECASE)
+
     text = re.sub(r"(?:\s+\b(?:DE|DEL)\b)+\s*$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"^[\s\-_/.,;:|\u2013\u2014]+", "", text)
     text = re.sub(r"[\s\-_/.,;:|\u2013\u2014]+$", "", text)
@@ -314,6 +321,8 @@ class LeaseAccountingPipeline:
     def _configure_account_reference(self) -> None:
         self.FIXED_ACCOUNT = self._account_code_for_concept("RF")
         self.VARIABLE_ACCOUNT = self._account_code_for_concept("RV")
+        self.ADMIN_SELL_CAM_ACCOUNT = self._account_code_for_description("ADMINISTRACION SELL CAM")
+        self.ADMIN_VARIABLE_ACCOUNT = self._account_code_for_description("ADMINISTRACION VARIABLE")
         self.VAT_ACCOUNT = (
             self._account_code_for_concept("IVA")
             or self._account_code_for_concept("VAT")
@@ -447,6 +456,20 @@ class LeaseAccountingPipeline:
             if self._concept_key(mapped_concept) == target:
                 return account_code
         return None
+
+    def _account_code_for_description(self, description: str | None) -> str | None:
+        target = self._concept_key(description)
+        if not target or self.account_reference.empty:
+            return None
+        matches = self.account_reference[
+            self.account_reference["description"].map(self._concept_key).eq(target)
+        ]
+        accounts = matches["account"].dropna().astype(str).unique()
+        if len(accounts) > 1:
+            raise PipelineError(
+                f"La descripción de cuenta '{description}' está asociada a más de una cuenta contable."
+            )
+        return accounts[0] if len(accounts) == 1 else None
 
     def run(
         self,
@@ -644,7 +667,6 @@ class LeaseAccountingPipeline:
         invoices["payable_rounding"] = pd.to_numeric(invoices["payable_rounding"], errors="coerce").map(round_cop)
         invoices["invoice_id"] = invoices["invoice_id"].map(self._normalize_invoice_id)
         invoices["vendor"] = invoices["vendor"].map(self._clean_numeric_code)
-        invoices["supplier_nit"] = invoices["supplier_nit"].map(self._normalize_nit)
         invoices["amount"] = (invoices["total"].fillna(0) - invoices["vat"].fillna(0)).map(
             lambda value: round_cop(value, 0)
         )
@@ -653,10 +675,6 @@ class LeaseAccountingPipeline:
         invoices["ceco_key"] = invoices["ceco"].map(self._ceco_key)
         invoices["invoice_vendor_key"] = invoices["invoice_id"].map(self._clean_text).fillna("") + "|" + invoices["vendor_key"].fillna("")
         invoices["invoice_pdf_key"] = invoices["invoice_id"].map(self._invoice_key)
-        invoices["invoice_nit_key"] = invoices.apply(
-            lambda row: self._invoice_nit_key(row.get("invoice_pdf_key"), row.get("supplier_nit")),
-            axis=1,
-        )
         if "invoice_input_type" not in invoices.columns:
             invoices["invoice_input_type"] = "table"
         else:
@@ -668,33 +686,12 @@ class LeaseAccountingPipeline:
             invoices = invoices[invoices["invoice_pdf_key"].notna()].copy()
             self._log(f"Ignored {blank_invoice_rows} blank rows from the invoices file.")
 
-        missing_nit_rows = invoices[invoices["supplier_nit"].isna()]
-        if table_input and not missing_nit_rows.empty:
-            for _, row in missing_nit_rows.iterrows():
-                invoice_id = self._clean_text(row.get("invoice_id")) or "SIN_NUMERO"
-                self.preflight_processing_issues.append({
-                    "invoice_id": invoice_id,
-                    "source_file": "invoices file",
-                    "store": self._clean_text(row.get("store")),
-                    "location": "invoices file",
-                    "problem": "La factura no tiene NIT de proveedor.",
-                    "possible_solution": "Completa la columna NIT en el archivo de facturas.",
-                    "issue_type": "missing_nit",
-                })
-            self._record_warning(f"Se omitieron {len(missing_nit_rows)} facturas del invoices file porque no tienen NIT.")
-            invoices = invoices.drop(index=missing_nit_rows.index).copy()
-
         invoice_supports = cleaned["invoice_supports"]
         if not invoice_supports.empty:
             invoice_supports["invoice_key"] = invoice_supports["invoice_id"].map(self._invoice_key)
-            invoice_supports["supplier_nit"] = invoice_supports["supplier_id"].map(self._normalize_nit)
-            invoice_supports["invoice_nit_key"] = invoice_supports.apply(
-                lambda row: self._invoice_nit_key(row.get("invoice_key"), row.get("supplier_nit")),
-                axis=1,
-            )
+            invoice_supports["supplier_nit"] = invoice_supports["supplier_id"]
             invoice_supports["split_factor"] = pd.to_numeric(invoice_supports.get("split_factor", 1), errors="coerce").fillna(1)
             invoice_keys = set(invoices["invoice_pdf_key"].dropna())
-            invoice_nit_keys = set(invoices["invoice_nit_key"].dropna())
             unmatched_numbers = invoice_supports[
                 ~invoice_supports["invoice_key"].isin(invoice_keys)
             ]
@@ -722,48 +719,6 @@ class LeaseAccountingPipeline:
                 )
                 invoice_supports = invoice_supports.drop(index=unmatched_numbers.index).copy()
 
-            invoice_supports = self._reconcile_permuted_support_nits(
-                invoices,
-                invoice_supports,
-            )
-            mismatched_nits = invoice_supports[
-                invoice_supports["invoice_key"].isin(invoice_keys)
-                & ~invoice_supports["invoice_nit_key"].isin(invoice_nit_keys)
-            ]
-            if not mismatched_nits.empty:
-                for _, support in mismatched_nits.iterrows():
-                    invoice_key = support.get("invoice_key")
-                    matching_rows = invoices.loc[invoices["invoice_pdf_key"].eq(invoice_key)]
-                    expected_nits = sorted(set(matching_rows["supplier_nit"].dropna().map(str).tolist()))
-                    stores = list(dict.fromkeys(matching_rows["store"].dropna().map(str).tolist()))
-                    invoice_id = self._clean_text(support.get("invoice_id")) or "SIN_NUMERO"
-                    source_file = self._clean_text(support.get("source_file")) or "archivo adjunto"
-                    store = ", ".join(stores) or None
-                    self.preflight_processing_issues.append(
-                        {
-                            "invoice_id": invoice_id,
-                            "source_file": source_file,
-                            "store": store,
-                            "location": " / ".join(value for value in [source_file, store] if value),
-                            "problem": (
-                                f"El NIT del XML ({support.get('supplier_nit') or 'VACIO'}) no coincide con "
-                                f"el NIT del invoices file ({', '.join(expected_nits) or 'VACIO'}); "
-                                "no se genero su CSV"
-                            ),
-                            "possible_solution": (
-                                "Corrige el NIT de la fila en el invoices file o adjunta el XML correcto. "
-                                "Si los NIT estan intercambiados, incluye el conjunto completo de facturas "
-                                "de la misma tienda y CeCo."
-                            ),
-                            "issue_type": "supplier_nit_mismatch",
-                        }
-                    )
-                self._record_warning(
-                    f"Se omitieron {len(mismatched_nits)} XML/PDF porque su NIT no coincide con el invoices file. "
-                    "El resto del lote continuo."
-                )
-                invoice_supports = invoice_supports.drop(index=mismatched_nits.index).copy()
-
             if table_input:
                 xml_supports = invoice_supports[
                     invoice_supports.get("source_type", pd.Series(index=invoice_supports.index, dtype=object))
@@ -777,8 +732,8 @@ class LeaseAccountingPipeline:
                         "Adjunta al menos un XML para generar archivos CSV."
                     )
 
-                matched_xml_keys = set(xml_supports["invoice_nit_key"].dropna())
-                omitted = invoices[~invoices["invoice_nit_key"].isin(matched_xml_keys)].copy()
+                matched_xml_keys = set(xml_supports["invoice_key"].dropna())
+                omitted = invoices[~invoices["invoice_pdf_key"].isin(matched_xml_keys)].copy()
                 omitted_ids = list(dict.fromkeys(omitted["invoice_id"].dropna().map(str).tolist()))
                 if omitted_ids:
                     preview = ", ".join(omitted_ids[:10])
@@ -788,8 +743,8 @@ class LeaseAccountingPipeline:
                         f"{preview}{extra}. No se generaron CSV para esas facturas."
                     )
 
-                invoices = invoices[invoices["invoice_nit_key"].isin(matched_xml_keys)].copy()
-                duplicate_subset = ["invoice_nit_key", "vendor_key", "store_key", "ceco_key"]
+                invoices = invoices[invoices["invoice_pdf_key"].isin(matched_xml_keys)].copy()
+                duplicate_subset = ["invoice_pdf_key", "vendor_key", "store_key", "ceco_key"]
                 duplicate_count = int(invoices.duplicated(subset=duplicate_subset, keep="first").sum())
                 if duplicate_count:
                     invoices = invoices.drop_duplicates(subset=duplicate_subset, keep="first").copy()
@@ -800,7 +755,7 @@ class LeaseAccountingPipeline:
 
             self._warn_support_store_mismatches(invoices, invoice_supports)
             invoice_supports = self._apply_support_split_factors(invoice_supports)
-            support_best = invoice_supports.sort_values(["invoice_nit_key", "flags"], na_position="first").drop_duplicates("invoice_nit_key")
+            support_best = invoice_supports.sort_values(["invoice_key", "flags"], na_position="first").drop_duplicates("invoice_key")
             support_best = support_best.rename(
                 columns={
                     "source_file": "support_source_file",
@@ -825,7 +780,6 @@ class LeaseAccountingPipeline:
                 support_best[
                     [
                         "invoice_key",
-                        "invoice_nit_key",
                         "support_source_file",
                         "support_ubl_document_type",
                         "support_invoice_date",
@@ -844,7 +798,8 @@ class LeaseAccountingPipeline:
                         "support_flags",
                     ]
                 ],
-                on="invoice_nit_key",
+                left_on="invoice_pdf_key",
+                right_on="invoice_key",
                 how="left",
             )
             invoices["invoice_date"] = invoices["invoice_date"].fillna(invoices["support_invoice_date"])
@@ -903,6 +858,9 @@ class LeaseAccountingPipeline:
         contracts["end_of_term"] = pd.to_datetime(contracts["end_of_term"], errors="coerce")
         contracts["rent_min"] = pd.to_numeric(contracts["rent_min"], errors="coerce").fillna(0)
         contracts["sell_media"] = pd.to_numeric(contracts["sell_media"], errors="coerce").fillna(0)
+        if "sell_cam" not in contracts.columns:
+            contracts["sell_cam"] = 0
+        contracts["sell_cam"] = pd.to_numeric(contracts["sell_cam"], errors="coerce").fillna(0)
 
         prorateo = cleaned["prorateo"]
         if "vendor_code" not in prorateo.columns:
@@ -1022,6 +980,8 @@ class LeaseAccountingPipeline:
         invoices = data["invoices"].copy()
         control = data["control"]
         contracts = data["contracts"].copy()
+        if "sell_cam" not in contracts.columns:
+            contracts["sell_cam"] = 0
         macro_database = data.get("macro_database", pd.DataFrame())
 
         vendor_map = control.drop_duplicates(subset=["vendor_key"])[["vendor_key", "store", "ceco", "vendor_code"]].rename(
@@ -1035,7 +995,10 @@ class LeaseAccountingPipeline:
         merged = merged.merge(store_map, on="store_key", how="left")
 
         prorateo = data["prorateo"]
-        prorateo_vendor = prorateo.drop_duplicates(subset=["vendor_key"])[["vendor_key", "vw_percent", "vq_percent", "ceco"]].rename(
+        generic_prorateo = prorateo[
+            prorateo["vendor_key"].notna() & prorateo["store_key"].isna() & prorateo["ceco_key"].isna()
+        ]
+        prorateo_vendor = generic_prorateo.drop_duplicates(subset=["vendor_key"])[["vendor_key", "vw_percent", "vq_percent", "ceco"]].rename(
             columns={"vw_percent": "vw_percent_vendor", "vq_percent": "vq_percent_vendor", "ceco": "prorateo_ceco_vendor"}
         )
         prorateo_store = prorateo.drop_duplicates(subset=["store_key"])[["store_key", "vw_percent", "vq_percent", "ceco"]].rename(
@@ -1045,8 +1008,14 @@ class LeaseAccountingPipeline:
             columns={"vw_percent": "vw_percent_ceco", "vq_percent": "vq_percent_ceco"}
         )
         merged = merged.merge(prorateo_vendor, on="vendor_key", how="left")
-        merged = merged.merge(prorateo_store, on="store_key", how="left")
-        merged = merged.merge(prorateo_ceco, left_on="ceco_key", right_on="ceco_key", how="left")
+        merged["prorateo_store_key"] = (
+            merged[["store", "control_store_store", "control_store_vendor"]]
+            .bfill(axis=1).iloc[:, 0].map(self._text_key)
+        )
+        merged = merged.merge(
+            prorateo_store[prorateo_store["store_key"].notna()],
+            left_on="prorateo_store_key", right_on="store_key", how="left", suffixes=("", "_prorateo"),
+        )
 
         if not macro_database.empty:
             macro_header = (
@@ -1100,6 +1069,25 @@ class LeaseAccountingPipeline:
         merged["mapped_ceco"] = merged["mapped_ceco"].combine_first(merged["macro_ceco"])
         merged["mapped_ceco_key"] = merged["mapped_ceco"].map(self._ceco_key)
 
+        for key, mapped_key, source in [
+            ("store_key", "prorateo_store_key", "vendor_store"),
+            ("ceco_key", "mapped_ceco_key", "vendor_ceco"),
+        ]:
+            specific_prorateo = (
+                prorateo[prorateo["vendor_key"].notna() & prorateo[key].notna()]
+                .drop_duplicates(subset=["vendor_key", key])[["vendor_key", key, "vw_percent", "vq_percent"]]
+                .rename(columns={
+                    key: mapped_key,
+                    "vw_percent": f"vw_percent_{source}",
+                    "vq_percent": f"vq_percent_{source}",
+                })
+            )
+            merged = merged.merge(specific_prorateo, on=["vendor_key", mapped_key], how="left")
+        merged = merged.merge(
+            prorateo_ceco[prorateo_ceco["ceco_key"].notna()].rename(columns={"ceco_key": "mapped_ceco_key"}),
+            on="mapped_ceco_key", how="left",
+        )
+
         contract_context = {}
         for ceco_key, rows in merged.groupby("mapped_ceco_key", dropna=True):
             contract_context[str(ceco_key)] = {
@@ -1115,7 +1103,7 @@ class LeaseAccountingPipeline:
         )
 
         merged = merged.merge(
-            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "status_en_rem"]],
+            contracts[["ceco_key", "end_of_term", "rent_min", "sell_media", "sell_cam", "status_en_rem"]],
             left_on="mapped_ceco_key",
             right_on="ceco_key",
             how="left",
@@ -1123,18 +1111,21 @@ class LeaseAccountingPipeline:
         merged["end_of_term"] = merged["end_of_term"].combine_first(merged["macro_end_of_term"])
         merged["rent_min"] = merged["rent_min"].combine_first(merged["macro_rent_min"])
         merged["status_en_rem"] = merged["status_en_rem"].combine_first(merged["macro_status_en_rem"])
-        merged["vw_percent"] = (
-            merged["vw_percent_vendor"]
-            .combine_first(merged["vw_percent_store"])
-            .combine_first(merged["vw_percent_ceco"])
-            .combine_first(merged["macro_vw_percent"])
-        )
-        merged["vq_percent"] = (
-            merged["vq_percent_vendor"]
-            .combine_first(merged["vq_percent_store"])
-            .combine_first(merged["vq_percent_ceco"])
-            .combine_first(merged["macro_vq_percent"])
-        )
+        merged["vw_percent"] = np.nan
+        merged["vq_percent"] = np.nan
+        merged["prorateo_source"] = None
+        for source, vw_column, vq_column in [
+            ("vendor_store", "vw_percent_vendor_store", "vq_percent_vendor_store"),
+            ("vendor_ceco", "vw_percent_vendor_ceco", "vq_percent_vendor_ceco"),
+            ("store", "vw_percent_store", "vq_percent_store"),
+            ("ceco", "vw_percent_ceco", "vq_percent_ceco"),
+            ("vendor", "vw_percent_vendor", "vq_percent_vendor"),
+            ("macro", "macro_vw_percent", "macro_vq_percent"),
+        ]:
+            use_source = merged["vw_percent"].isna() & merged[vw_column].notna()
+            merged.loc[use_source, "vw_percent"] = merged.loc[use_source, vw_column]
+            merged.loc[use_source, "vq_percent"] = merged.loc[use_source, vq_column]
+            merged.loc[use_source, "prorateo_source"] = source
         merged["vq_percent"] = merged["vq_percent"].combine_first((1 - merged["vw_percent"]).clip(lower=0, upper=1))
         merged["profit_center"] = merged["macro_profit_center"].combine_first(merged["mapped_ceco"])
         self._log(f"Merging completed. Matched variables for {len(merged)} invoice rows:")
@@ -1144,8 +1135,10 @@ class LeaseAccountingPipeline:
                 f"Store={row['store']} (Mapped Store={row['mapped_store']}), "
                 f"CECO={row['ceco']} (Mapped CECO={row['mapped_ceco']}), "
                 f"Contract End={row['end_of_term']} (Rent Min={row['rent_min']}, "
-                f"Sell Media={row['sell_media']}, Status={row['status_en_rem']}), "
-                f"Prorateo VW%={row['vw_percent']}, VQ%={row['vq_percent']}, Profit Center={row['profit_center']}"
+                f"Sell Media={row['sell_media']}, Sell CAM={row['sell_cam']}, "
+                f"Status={row['status_en_rem']}), "
+                f"Prorateo VW%={row['vw_percent']}, VQ%={row['vq_percent']} "
+                f"(Source={row['prorateo_source']}), Profit Center={row['profit_center']}"
             )
         return merged
 
@@ -1212,7 +1205,7 @@ class LeaseAccountingPipeline:
         df["vat"] = pd.to_numeric(df["vat"], errors="coerce").map(lambda value: round_cop(value, 0))
         df["vat_total"] = df["vat"]
         df["vat_vw"] = (df["vat"] * df["vw_percent"].fillna(0)).map(lambda value: round_cop(value, 0))
-        df["vat_vq"] = df["vat_vw"]
+        df["vat_vq"] = (df["vat"] - df["vat_vw"]).map(lambda value: round_cop(value, 0))
         df["withholding_tax_amount"] = pd.to_numeric(df["withholding_tax"], errors="coerce").map(round_cop)
         df["invoice_total"] = (
             pd.to_numeric(df["amount"], errors="coerce").fillna(0) + df["vat_total"].fillna(0)
@@ -1233,7 +1226,8 @@ class LeaseAccountingPipeline:
             self._log(
                 f"  Invoice [{row['invoice_id']}]: Contract Status={row['status_en_rem']} "
                 f"-> ContractActive={row['contract_active']} -> Class={row['rent_type']} -> Account={row['account']}. "
-                f"VAT={row['vat_total']} -> VW={row['vat_vw']} (using VW%={row['vw_percent']}), VQ reversal={row['vat_vq']}. "
+                f"VAT={row['vat_total']} -> VW={row['vat_vw']} (using VW%={row['vw_percent']}), "
+                f"VQ={row['vat_vq']}, VQ reversal={row['vat_vw']}. "
                 f"Discount={row['discount_total']} (posting reduction={row['posting_discount_total']}), "
                 f"Withholding={row['withholding_tax_amount']}, Text='{row['text']}'"
             )
@@ -1251,6 +1245,7 @@ class LeaseAccountingPipeline:
                 "concept",
                 "rent_type",
                 "sell_media",
+                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -1612,7 +1607,7 @@ class LeaseAccountingPipeline:
                 },
             )
         )
-        required = {"invoice_id", "vendor", "supplier_nit"}
+        required = {"invoice_id", "vendor"}
         missing = required - set(df.columns)
         if missing:
             raise PipelineError(
@@ -1700,6 +1695,7 @@ class LeaseAccountingPipeline:
                         "end_of_term": ["end_of_term", "end_of_term_en_virtual_contract"],
                         "rent_min": ["rent_min_rent", "rent_min"],
                         "sell_media": ["sell_media"],
+                        "sell_cam": ["sell_cam"],
                         "status_en_rem": ["status_en_rem"],
                     },
                 )
@@ -1720,6 +1716,7 @@ class LeaseAccountingPipeline:
                 "end_of_term",
                 "rent_min",
                 "sell_media",
+                "sell_cam",
                 "status_en_rem",
                 "country_sheet",
                 "source_row",
@@ -2872,6 +2869,8 @@ class LeaseAccountingPipeline:
         ]:
             if col in summary_df.columns:
                 summary_df[col] = pd.to_numeric(summary_df[col], errors="coerce").map(round_cop)
+        if "sell_cam" not in summary_df.columns:
+            summary_df["sell_cam"] = 0
         summary_df["invoice_date"] = pd.to_datetime(summary_df["invoice_date"], errors="coerce")
         summary_df["posting_key"] = summary_df["invoice_id"].fillna("") + "|" + summary_df["vendor"].fillna("")
         summary_df["posting_index"] = summary_df.groupby("invoice_id").cumcount() + 1
@@ -2971,6 +2970,8 @@ class LeaseAccountingPipeline:
                     continue
                 item_concept, item_account = self._item_line_classification(item, row)
                 item_text = self._build_text(row["invoice_date"], item_concept, row["store"], row["ceco"])
+                credit_note = bool(row.get("is_credit_note", False))
+                item_amount = -abs(float(item_amount)) if credit_note else abs(float(item_amount))
                 item_rows.append(
                     {
                         **base,
@@ -3006,7 +3007,7 @@ class LeaseAccountingPipeline:
             ).iloc[0]
             if pd.notna(posting_discount_total) and float(posting_discount_total) > 0:
                 allocations = self._allocate_proportionally(
-                    [expense_row.get("amount") for expense_row in expense_rows],
+                    [abs(float(expense_row.get("amount") or 0)) for expense_row in expense_rows],
                     float(posting_discount_total),
                 )
                 discount_text = self._build_text(
@@ -3060,6 +3061,19 @@ class LeaseAccountingPipeline:
                     }
                 )
 
+            if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
+                line_rows.append(
+                    {
+                        **base,
+                        "line_type": "vat_vq_reversal",
+                        "posting_key": "50",
+                        "account": self.VAT_ACCOUNT,
+                        "concept": row["concept"],
+                        "tax_code": "VQ",
+                        "amount": row["vat_vw"],
+                    }
+                )
+
         lines_df = pd.DataFrame(line_rows)
         if lines_df.empty:
             lines_df = pd.DataFrame(
@@ -3106,6 +3120,7 @@ class LeaseAccountingPipeline:
                 "account",
                 "concept",
                 "rent_type",
+                "sell_cam",
                 "amount",
                 "gross_amount",
                 "discount_total",
@@ -3455,120 +3470,10 @@ class LeaseAccountingPipeline:
         text = self._clean_text(value)
         if not text:
             return None
+        if re.fullmatch(r"\d+\.0+", text):
+            text = text.split(".")[0]
         digits = re.sub(r"[^0-9]", "", text)
         return digits or None
-
-    def _normalize_nit(self, value) -> str | None:
-        text = self._clean_text(value)
-        if not text:
-            return None
-        if re.fullmatch(r"\d+\.0", text):
-            text = text[:-2]
-        explicit_dv = re.fullmatch(r"\s*([0-9.]+)\s*-\s*(\d)\s*", text)
-        if explicit_dv:
-            return re.sub(r"\D", "", explicit_dv.group(1)) or None
-
-        digits = re.sub(r"\D", "", text)
-        if len(digits) == 10 and self._colombian_nit_check_digit(digits[:-1]) == int(digits[-1]):
-            return digits[:-1]
-        return digits or None
-
-    def _colombian_nit_check_digit(self, nit_base: str) -> int | None:
-        if not nit_base or not nit_base.isdigit() or len(nit_base) > 15:
-            return None
-        weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3]
-        selected_weights = weights[-len(nit_base):]
-        remainder = sum(int(digit) * weight for digit, weight in zip(nit_base, selected_weights)) % 11
-        return remainder if remainder < 2 else 11 - remainder
-
-    def _invoice_nit_key(self, invoice_key, supplier_nit) -> str | None:
-        normalized_invoice = self._invoice_key(invoice_key)
-        normalized_nit = self._normalize_nit(supplier_nit)
-        if not normalized_invoice or not normalized_nit:
-            return None
-        return f"{normalized_invoice}|{normalized_nit}"
-
-    def _reconcile_permuted_support_nits(
-        self,
-        invoices: pd.DataFrame,
-        invoice_supports: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Accept complete NIT permutations within one store and cost center."""
-        if invoices.empty or invoice_supports.empty:
-            return invoice_supports
-
-        reconciled = invoice_supports.copy()
-        mapped_supports = []
-        for support_index, support in reconciled.iterrows():
-            invoice_key = support.get("invoice_key")
-            if not invoice_key:
-                continue
-            matching_rows = invoices.loc[invoices["invoice_pdf_key"].eq(invoice_key)]
-            if matching_rows.empty:
-                continue
-
-            identities = matching_rows[
-                [
-                    "invoice_nit_key",
-                    "supplier_nit",
-                    "store_key",
-                    "ceco_key",
-                    "store",
-                    "ceco",
-                ]
-            ].drop_duplicates()
-            if len(identities) != 1:
-                continue
-
-            expected = identities.iloc[0]
-            actual_nit = self._normalize_nit(support.get("supplier_nit"))
-            expected_nit = self._normalize_nit(expected.get("supplier_nit"))
-            store_key = self._text_key(expected.get("store_key"))
-            ceco_key = self._ceco_key(expected.get("ceco_key"))
-            if not actual_nit or not expected_nit or not store_key or not ceco_key:
-                continue
-
-            mapped_supports.append(
-                {
-                    "support_index": support_index,
-                    "invoice_id": self._clean_text(support.get("invoice_id")) or "SIN_NUMERO",
-                    "actual_nit": actual_nit,
-                    "expected_nit": expected_nit,
-                    "expected_invoice_nit_key": expected.get("invoice_nit_key"),
-                    "store_key": store_key,
-                    "ceco_key": ceco_key,
-                    "store": self._clean_text(expected.get("store")) or store_key,
-                    "ceco": self._clean_text(expected.get("ceco")) or ceco_key,
-                }
-            )
-
-        if not mapped_supports:
-            return reconciled
-
-        mapped = pd.DataFrame(mapped_supports)
-        for _group_key, group in mapped.groupby(["store_key", "ceco_key"], sort=False):
-            if len(group) < 2:
-                continue
-            actual_nits = Counter(group["actual_nit"].tolist())
-            expected_nits = Counter(group["expected_nit"].tolist())
-            has_interchange = bool((group["actual_nit"] != group["expected_nit"]).any())
-            if not has_interchange or actual_nits != expected_nits:
-                continue
-
-            for _, item in group.iterrows():
-                reconciled.at[item["support_index"], "invoice_nit_key"] = item[
-                    "expected_invoice_nit_key"
-                ]
-
-            invoice_ids = ", ".join(dict.fromkeys(group["invoice_id"].tolist()))
-            first = group.iloc[0]
-            self._record_warning(
-                f"Se detectaron y reconciliaron NIT intercambiados entre {len(group)} facturas de "
-                f"{first['store']} / CeCo {first['ceco']}: {invoice_ids}. Se conservaron el Vendor, "
-                "la tienda y el CeCo de cada fila del invoices file."
-            )
-
-        return reconciled
 
     def _extract_primary_code(self, value) -> str | None:
         text = self._clean_text(value)
@@ -3685,7 +3590,7 @@ class LeaseAccountingPipeline:
             )
 
         invoice_id = self._clean_text(row.get("invoice_id")) or "SIN_NUMERO"
-        review_key = self._clean_text(row.get("invoice_nit_key")) or self._invoice_key(invoice_id)
+        review_key = self._clean_text(row.get("invoice_pdf_key")) or self._invoice_key(invoice_id)
         if not review_key:
             return None
         return {
@@ -3992,12 +3897,27 @@ class LeaseAccountingPipeline:
         return "SIN CLASIFICAR", ""
 
     def _resolve_gc_item_classification(self, concept: str, account: str, row) -> tuple[str, str]:
-        if self._concept_key(concept) not in {"GC", "GC VARIABLE"}:
+        normalized_concept = self._concept_key(concept)
+        if normalized_concept == "GC V":
+            sell_cam = pd.to_numeric(pd.Series([row.get("sell_cam")]), errors="coerce").iloc[0]
+            if pd.notna(sell_cam) and float(sell_cam) > 0:
+                return "GF", (
+                    self.ADMIN_SELL_CAM_ACCOUNT
+                    or self.FIXED_ACCOUNT
+                    or account
+                )
+            return "GV", (
+                self.ADMIN_VARIABLE_ACCOUNT
+                or self._account_code_for_concept("GC VARIABLE")
+                or self._account_code_for_concept("GC")
+                or account
+            )
+        if normalized_concept not in {"GC", "GC VARIABLE"}:
             return concept, account
         sell_media = pd.to_numeric(pd.Series([row.get("sell_media")]), errors="coerce").iloc[0]
         if pd.notna(sell_media) and float(sell_media) > 0:
             return "GC", self.FIXED_ACCOUNT
-        return "GC VARIABLE", self._account_code_for_concept("GC VARIABLE") or self._account_code_for_concept("GC")
+        return "GC V", self._account_code_for_concept("GC VARIABLE") or self._account_code_for_concept("GC")
 
     def _match_learning_dictionary(self, description: str | None, row) -> tuple[str, str] | None:
         description_key = self._concept_key(normalize_learning_phrase(description))
@@ -4149,9 +4069,6 @@ class LeaseAccountingPipeline:
         return float(percent) >= 0.999999
 
     def _expense_tax_code(self, row) -> str:
-        vat_total = pd.to_numeric(pd.Series([row.get("vat_total")]), errors="coerce").iloc[0]
-        if pd.isna(vat_total) or abs(float(vat_total)) == 0:
-            return "V0"
         if self._is_full_vw_prorate(row.get("vw_percent")):
             return "VW"
         return "VQ"
@@ -4210,11 +4127,10 @@ class LeaseAccountingPipeline:
             source_file = self._clean_text(support.get("source_file"))
             filename_store = self._extract_store_from_filename(Path(source_file)) if source_file else None
             invoice_key = self._clean_text(support.get("invoice_key"))
-            invoice_nit_key = self._clean_text(support.get("invoice_nit_key"))
-            if not filename_store or not invoice_key or not invoice_nit_key:
+            if not filename_store or not invoice_key:
                 continue
 
-            matches = invoices[invoices["invoice_nit_key"] == invoice_nit_key]
+            matches = invoices[invoices["invoice_pdf_key"] == invoice_key]
             expected_stores = sorted(
                 {
                     store

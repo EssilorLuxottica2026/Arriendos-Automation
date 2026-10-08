@@ -388,7 +388,7 @@ Fields that are currently useful for audit/debugging but not required by the cor
 - confidence_score
 
 Critical nuance:
-- the pipeline expects vendor primarily as a code/NIT/acreedor-like identifier, not just a free-form vendor name
+- the pipeline expects vendor primarily as a code/acreedor-like identifier, not just a free-form vendor name (NIT processing has been removed; batches contain a single supplier so NIT is no longer used as a matching key)
 
 
 9. CURRENT PDF EXTRACTION / OCR REALITY

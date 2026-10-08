@@ -87,7 +87,6 @@ def build_invoices_normalized(path: Path) -> tuple[dict[str, pd.DataFrame], pd.D
             "invoice_date": pd.NaT,
             "subtotal": pd.NA,
             "vat_total": pd.NA,
-            "nit": raw.get("nit"),
             "source_file": path.name,
         }
     )
@@ -112,7 +111,6 @@ def build_control_normalized(path: Path) -> tuple[dict[str, pd.DataFrame], pd.Da
             "ceco": arriendo.get("c_c"),
             "vendor_code": arriendo.get("acreedor_arriendo").map(extract_primary_code),
             "vendor_name": arriendo.get("proveedor_arriendo"),
-            "nit": arriendo.get("nit"),
             "monthly_canon_reference": to_numeric(arriendo.get("canon_mes_2")),
             "source_sheet": "ARRIENDO 2022",
         }
@@ -124,7 +122,6 @@ def build_control_normalized(path: Path) -> tuple[dict[str, pd.DataFrame], pd.Da
             "ceco": admon.get("c_c"),
             "vendor_code": admon.get("acreedor_admon").map(extract_primary_code),
             "vendor_name": admon.get("proveedor_administracion"),
-            "nit": admon.get("nit"),
             "monthly_fee_reference": to_numeric(admon.get("canon_mes")),
             "source_sheet": "ADMON 2022",
         }
@@ -199,7 +196,6 @@ def build_prorateo_normalized(path: Path) -> tuple[dict[str, pd.DataFrame], pd.D
             "store_name": raw.get("nombre_tienda"),
             "city": raw.get("ciudad"),
             "ceco": raw.get("ceco"),
-            "nit": raw.get("nit"),
             "current_canon_value": to_numeric(raw.get("valor_actual_canon")),
             "vat_canon": to_numeric(raw.get("iva_canon")),
             "vat_vw_amount": to_numeric(raw.get("iva_deducible_vw")),
