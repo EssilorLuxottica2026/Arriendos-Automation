@@ -41,6 +41,7 @@ class ParsedInvoiceSupport:
     has_zero_iva_hint: bool
     text_excerpt: str
     flags: str | None
+    barcode: str | None = None
 
 
 class InvoiceSupportReader:
@@ -80,12 +81,17 @@ class InvoiceSupportReader:
     }
 
     def parse_many(self, paths: list[Path]) -> pd.DataFrame:
-        records = [self.parse_file(path).__dict__ for path in paths]
+        records = [
+            {**self.parse_file(path).__dict__, "source_path": str(path.resolve())}
+            for path in paths
+        ]
         columns = [
             "source_file",
+            "source_path",
             "source_type",
             "document_type",
             "invoice_id",
+            "barcode",
             "supplier_id",
             "supplier_name",
             "invoice_date",
@@ -171,7 +177,9 @@ class InvoiceSupportReader:
         )
 
     def _parse_xml_file(self, path: Path) -> ParsedInvoiceSupport:
-        document_root = self._extract_invoice_root_from_xml(path)
+        xml_root = ET.parse(path).getroot()
+        barcode = self._find_text(xml_root, "./cbc:ParentDocumentID")
+        document_root = self._extract_invoice_root_from_xml(path, root=xml_root)
         document_type = self._local_name(document_root)
         monetary_total_path = (
             ".//cac:RequestedMonetaryTotal/cbc:LineExtensionAmount"
@@ -223,6 +231,7 @@ class InvoiceSupportReader:
         return ParsedInvoiceSupport(
             source_file=path.name,
             source_type="xml",
+            barcode=barcode,
             document_type=document_type,
             invoice_id=invoice_id,
             supplier_id=supplier_id,
@@ -251,8 +260,9 @@ class InvoiceSupportReader:
         text = "\n".join(text_parts)
         return re.sub(r"[ \t]+", " ", text)
 
-    def _extract_invoice_root_from_xml(self, path: Path) -> ET.Element:
-        root = ET.parse(path).getroot()
+    def _extract_invoice_root_from_xml(self, path: Path, root: ET.Element | None = None) -> ET.Element:
+        if root is None:
+            root = ET.parse(path).getroot()
         root_type = self._local_name(root)
         if root_type in {"Invoice", "CreditNote", "DebitNote"}:
             return root

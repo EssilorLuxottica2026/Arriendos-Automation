@@ -61,10 +61,18 @@
         </div>
 
         <!-- REJILLA DE DESCARGAS -->
-        {% if result.output_csv or result.invoice_csv_bundle or result.manual_style_csv_bundle %}
+        {% if result.output_csv or result.invoice_csv_bundle or result.manual_style_csv_bundle or result.bot_control_json %}
         <section class="panel">
             <h2>Descargas Disponibles</h2>
             <div class="downloads-grid">
+                {% if result.bot_control_json %}<div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Control de facturas para el bot</div>
+                        <div class="download-desc">Paquete con solo JSON y CSV de Allocated Costs; no incluye soportes XML, headers ni invoice manual. Las relaciones incorrectas quedan pendientes de revisi&oacute;n. Ruta single vendor; duplicados no verificados.</div>
+                    </div>
+                    <a class="button-link" href="{{ url_for('download', filename=result.bot_control_json) }}">Descargar JSON</a>
+                    {% if result.bot_control_bundle %}<a class="button-link primary" href="{{ url_for('download', filename=result.bot_control_bundle) }}">Descargar paquete del bot</a>{% endif %}
+                </div>{% endif %}
                 
                 <!-- ZIP DE LINEAS CONTABLES POR FACTURA -->
                 {% if result.output_csv %}<div class="download-card">

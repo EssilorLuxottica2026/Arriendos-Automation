@@ -91,6 +91,97 @@ ties.
 - `src/lease_accounting/pipeline/`: pipeline and support parsing logic
 - `pipeline/`: compatibility layer for older imports
 
+## Invoice control for the bot
+
+Each successful processing run saves `control_facturas_bot.json` in its own
+output directory. Run directories include seconds and microseconds so a new run
+does not overwrite an earlier control file or the bot's progress.
+The results page and command-line runner expose the JSON and a bot ZIP package.
+The bot package contains only the JSON and the linked Allocated Costs CSVs,
+keeping their relative directory structure. It excludes invoice XML supports,
+header CSVs and manual-style invoice CSVs. Extract the complete package before
+using it; every `csv.allocated_costs` path resolves from the extracted JSON.
+The other file references remain in the JSON for preparation traceability and
+refer to the full output directory, not files included in the bot ZIP.
+XML validation and local support copies are preserved, as are the separate
+invoice CSV downloads. The bot does not accept PDF supports.
+
+The versioned JSON contains a `facturas` list with one entry per processed folio:
+
+- `folio`, `vendor`, `vendors`, and total `importe`.
+- `ruta`, `estado`, `lista_para_bot`, `documento_sap`, UTC processing/update
+  dates, `error`, and `pasos_confirmados`.
+- `partes`: each posting's vendor, store (`tienda`), CeCo, profit center, base,
+  VAT, amount, currency, invoice date, and document type.
+- Each part links its copied support (`archivo_factura`), original source path,
+  header CSV, Allocated Costs CSV, and manual-style invoice CSV.
+  `allocated_costs` also contains the exact exported rows, without the internal
+  posting index. CSV and copied-support paths are relative to the JSON directory.
+- Each part reserves `identificador_lucy`, `barcode`, `documento_sap`,
+  `copia_lucy`, and `compensacion_sap`. Unknown values remain JSON `null`;
+  preparation never confirms a Lucy copy, SAP posting, or compensation.
+
+Only `single_vendor` is enabled. A folio with several postings for the same vendor
+keeps separate parts and CSVs. Folios distributed across multiple vendors retain
+their existing accounting exports but have `ruta: null`,
+`estado: "pendiente_ruta"`, and `lista_para_bot: false`. Missing invoice supports
+are reported as `pendiente_archivo`, also preventing bot execution.
+`preparada` confirms only the preparation step, not execution by the bot.
+
+### Preparation validation (schema version 2)
+
+Before saving the control, the pipeline verifies:
+
+- A nonblank folio, vendor and store; a valid CeCo using the existing rules;
+  profit center, invoice date, COP currency and a positive total equal to
+  base plus VAT. Base and VAT must not be negative.
+- The support is a readable invoice/credit-note/debit-note XML. Its folio,
+  document type, invoice date and available `ParentDocumentID` must agree
+  with the prepared record. A folio linked to multiple XMLs requires review.
+- For an XML shared across parts, the sum of gross amounts and VAT must match
+  the XML's extracted amounts, using the existing whole-peso rounding rules.
+  Gross amounts are checked before applied discounts, not against the net
+  payable amount, so discount preparation is preserved.
+- The header, Allocated Costs and manual-style CSVs exist inside the output
+  directory and are linked to a single part. The header and Allocated Costs
+  CSV contents must match the prepared rows. The manual CSV must retain the
+  correct folio, total and allocated costs section. Empty allocations,
+  incorrect assignments, missing accounts and mismatched profit centers
+  require review.
+
+An uncertain or incorrect relationship is saved with `pendiente_revision`,
+an explicit `error`, and `lista_para_bot: false`; it also appears in the results
+warnings. Missing required files prevent publication of a successful control.
+Successful checks append `validacion_preparacion_completada` to confirmed steps.
+The JSON includes per-invoice `validaciones` and a `resumen_validacion` with
+validated and pending counts. Validation is scoped to preparation: it is not
+a substitute for checks immediately before the future bot executes.
+
+Duplicate handling is deliberately deferred. `verificacion_duplicados` is
+`no_ejecutada`, and `lista_para_bot` means only that the data, XML and CSV
+preparation passed. Neither prior JSON controls nor an external posting list
+are checked. `FACTURAS_CONTABILIZADAS` remains exclusively the account catalog
+and must not be interpreted as evidence that an invoice was posted.
+
+Optional invoice input columns `Lucy_ID` / `Identificador_Lucy` / `ID_Lucy` /
+`Document_ID` and `Barcode` / `Bar_Code` / `Codigo_de_barras` / `Codigo_barras`
+are carried into the corresponding parts. Text identifiers retain leading zeros
+(Excel cells must store them as text). If these columns are absent, the bot can
+fill the identifiers later.
+For XML inputs and matched XML supports, `barcode` is read from the outer
+document's `cbc:ParentDocumentID`, including `AttachedDocument` containers,
+before extracting the embedded invoice or credit/debit note. Its text value is
+preserved (for example `004092`); this XML value takes precedence over the table
+column. If the XML has no `ParentDocumentID`, the optional table value is retained
+or the JSON contains `null`. Neither the container's `cbc:ID` nor the invoice
+folio is used as a substitute barcode.
+
+Invoices excluded by current validation/review rules are not in the executable
+`facturas` list. Available omission reasons are stored separately in
+`incidencias_procesamiento`; the existing reports and warnings remain available.
+The JSON is a preparation snapshot, not a global duplicate-posting registry:
+the future bot must check Lucy/SAP before executing invoices from another run.
+
 ## Out of scope
 
 - Posting in Lucy

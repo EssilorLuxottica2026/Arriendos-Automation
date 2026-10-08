@@ -1,4 +1,5 @@
 import csv
+import json
 import logging
 import re
 import unicodedata
@@ -14,6 +15,8 @@ from openpyxl.styles import Font, PatternFill
 
 from .pdf_reader import InvoiceSupportReader
 from .money import allocate_cop, round_cop
+from .bot_control import write_bot_control
+from .bot_validation import validate_preparation
 
 
 LOGGER = logging.getLogger(__name__)
@@ -68,6 +71,8 @@ class PipelineResult:
     processing_issues: list[dict]
     logs: list[str]
     warnings: list[str]
+    bot_control_json: str
+    bot_control_bundle: str
 
     def to_dict(self) -> dict:
         return {
@@ -80,6 +85,8 @@ class PipelineResult:
             "processing_issues": self.processing_issues,
             "logs": self.logs,
             "warnings": self.warnings,
+            "bot_control_json": self.bot_control_json,
+            "bot_control_bundle": self.bot_control_bundle,
         }
 
 
@@ -494,7 +501,7 @@ class LeaseAccountingPipeline:
         self.discount_review_items = []
         self.beneficiary_review_items = []
         self.preflight_processing_issues = []
-        run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M")
+        run_folder_name = pd.Timestamp.now().strftime("%Y.%m.%d_%H.%M.%S_%f")
         self.output_dir = self.base_output_dir / run_folder_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
         data, output_df, validation_df = self.prepare(
@@ -626,6 +633,8 @@ class LeaseAccountingPipeline:
                     "support_discounts",
                     "split_weights",
                     "support_split_weights",
+                    "source_path",
+                    "invoice_source_path",
                 }:
                     continue
                 if df[col].dtype == object:
@@ -635,6 +644,9 @@ class LeaseAccountingPipeline:
         invoices = cleaned["invoices"]
         for col in [
             "invoice_id",
+            "lucy_id",
+            "barcode",
+            "invoice_source_path",
             "vendor",
             "supplier_nit",
             "store",
@@ -759,6 +771,8 @@ class LeaseAccountingPipeline:
             support_best = support_best.rename(
                 columns={
                     "source_file": "support_source_file",
+                    "source_path": "support_source_path",
+                    "barcode": "support_barcode",
                     "document_type": "support_ubl_document_type",
                     "invoice_date": "support_invoice_date",
                     "due_date": "support_due_date",
@@ -781,6 +795,8 @@ class LeaseAccountingPipeline:
                     [
                         "invoice_key",
                         "support_source_file",
+                        "support_source_path",
+                        "support_barcode",
                         "support_ubl_document_type",
                         "support_invoice_date",
                         "support_due_date",
@@ -803,6 +819,7 @@ class LeaseAccountingPipeline:
                 how="left",
             )
             invoices["invoice_date"] = invoices["invoice_date"].fillna(invoices["support_invoice_date"])
+            invoices["barcode"] = invoices["support_barcode"].combine_first(invoices["barcode"])
             invoices["due_date"] = invoices["due_date"].fillna(invoices["support_due_date"])
             invoices["vat"] = invoices["vat"].where(
                 invoices["vat"].fillna(0) != 0,
@@ -840,6 +857,7 @@ class LeaseAccountingPipeline:
                 )
             invoices["support_flags"] = None
             invoices["support_source_file"] = None
+            invoices["support_source_path"] = invoices["invoice_source_path"]
             invoices["ubl_document_type"] = invoices["ubl_document_type"].fillna("Invoice")
             invoices["support_split_factor"] = 1
             invoices["support_split_index"] = 1
@@ -1243,9 +1261,14 @@ class LeaseAccountingPipeline:
 
         validation_df = self._build_validations(df)
         expanded = self._apply_distribution(df)
+        for column in ["lucy_id", "barcode", "support_source_path"]:
+            if column not in expanded.columns:
+                expanded[column] = None
         output_df = expanded[
             [
                 "invoice_id",
+                "lucy_id",
+                "barcode",
                 "vendor",
                 "store",
                 "ceco",
@@ -1279,6 +1302,7 @@ class LeaseAccountingPipeline:
                 "discount_decisions",
                 "estimated_payment_date",
                 "support_source_file",
+                "support_source_path",
                 "support_split_factor",
                 "support_split_index",
                 "contract_status_blocked",
@@ -1334,6 +1358,8 @@ class LeaseAccountingPipeline:
         if output_df.empty:
             raise PipelineError("Todas las facturas del lote fallaron la validacion o no tienen conceptos. Corrige los errores antes de generar los archivos.")
 
+        if (self.output_dir / "control_facturas_bot.json").exists():
+            raise PipelineError("El control del bot ya existe; genera una nueva ejecucion para conservar su avance.")
         self._log("Writing per-invoice Allocated Costs CSV ZIP and individual invoice ZIP bundles.")
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
         allocated_bundle_name = f"allocated_costs_csv_bundle_{timestamp}.zip"
@@ -1354,6 +1380,11 @@ class LeaseAccountingPipeline:
             summary_df = summary_df[~summary_df["invoice_id"].isin(blocked_invoice_ids)].copy()
             headers_df = headers_df[~headers_df["invoice_id"].isin(blocked_invoice_ids)].copy()
             lines_df = lines_df[~lines_df["invoice_id"].isin(blocked_invoice_ids)].copy()
+        if summary_df.empty:
+            raise PipelineError("No hay facturas habilitadas para generar los archivos y el control del bot.")
+        file_stems = [self._posting_file_stem(row).casefold() for _, row in summary_df.iterrows()]
+        if len(file_stems) != len(set(file_stems)):
+            raise PipelineError("Dos facturas generan el mismo nombre de archivo. Revisa sus folios antes de exportar.")
         self._log(f"Writing {len(summary_df)} summary records to Lucy Excel/CSV:")
         for idx, row in summary_df.iterrows():
             self._log(
@@ -1389,6 +1420,42 @@ class LeaseAccountingPipeline:
             bundle_name=manual_style_bundle_name,
             timestamp=timestamp,
         )
+        processing_issues = [
+            *self.preflight_processing_issues,
+            *self._build_processing_issues(validation_df),
+        ]
+        bot_json_name = "control_facturas_bot.json"
+        bot_bundle_name = f"bot_single_vendor_{timestamp}.zip"
+        postings = []
+        for _, row in summary_df.iterrows():
+            stem = self._posting_file_stem(row)
+            record = json.loads(pd.DataFrame([row]).to_json(orient="records", date_format="iso"))[0]
+            record["archivos_csv"] = {
+                "header": str(Path(f"invoice_csvs_{timestamp}") / stem / f"{stem}_header.csv"),
+                "allocated_costs": str(Path(f"allocated_costs_csvs_{timestamp}") / f"{stem}_allocated_costs.csv"),
+                "factura": str(Path(f"invoice_manual_style_csvs_{timestamp}") / f"{stem}_manual_style.csv"),
+            }
+            record["allocated_costs"] = json.loads(
+                self._lucy_slice_for_posting(lucy_export_df, row).to_json(orient="records")
+            )
+            record["header"] = json.loads(
+                self._header_slice_for_posting(header_export_df, row).to_json(orient="records")
+            )
+            postings.append(record)
+        try:
+            preparation_errors = validate_preparation(
+                self.output_dir, postings, self._invoice_key, self._text_key,
+                self._is_valid_ceco_value,
+            )
+            bot_warnings = write_bot_control(
+                self.output_dir, postings, processing_issues, bot_json_name, bot_bundle_name,
+                preparation_errors=preparation_errors,
+            )
+        except (OSError, ValueError) as exc:
+            LOGGER.error("Failed to write bot control: %s", exc)
+            raise PipelineError(f"No se pudo guardar el control JSON del bot: {exc}") from exc
+        for warning in bot_warnings:
+            self._record_warning(warning)
         # Write execution logs to a physical log file inside self.output_dir
         log_file_path = self.output_dir / "pipeline.log"
         try:
@@ -1406,12 +1473,11 @@ class LeaseAccountingPipeline:
             output_rows=len(summary_df),
             header_rows=len(header_export_df),
             validation_rows=len(validation_df),
-            processing_issues=[
-                *self.preflight_processing_issues,
-                *self._build_processing_issues(validation_df),
-            ],
+            processing_issues=processing_issues,
             logs=self.logs.copy(),
             warnings=self.warnings.copy(),
+            bot_control_json=f"{run_folder_name}/{bot_json_name}",
+            bot_control_bundle=f"{run_folder_name}/{bot_bundle_name}",
         )
 
     def _load_invoice_supports(
@@ -1574,7 +1640,7 @@ class LeaseAccountingPipeline:
             df["invoice_input_type"] = "xml"
             return df
 
-        df = self._safe_read_table(path)
+        df = self._safe_read_table(path, dtype=str)
         original_columns = [self._clean_text(col) or str(col) for col in df.columns]
         df = df.rename(
             columns=self._best_effort_rename(
@@ -1613,6 +1679,8 @@ class LeaseAccountingPipeline:
                     "vat": ["vat", "iva", "valor_iva", "tax"],
                     "invoice_date": ["invoice_date", "fecha_factura", "fecha", "date"],
                     "ceco": ["ceco", "cost_center", "cc", "c_c"],
+                    "lucy_id": ["lucy_id", "identificador_lucy", "id_lucy", "document_id"],
+                    "barcode": ["barcode", "bar_code", "codigo_de_barras", "codigo_barras"],
                 },
             )
         )
@@ -1635,6 +1703,8 @@ class LeaseAccountingPipeline:
         store = self._extract_store_from_filename(path)
         data = {
             "invoice_id": parsed.invoice_id,
+            "invoice_source_path": str(path.resolve()),
+            "barcode": parsed.barcode,
             "vendor": parsed.supplier_id,
             "supplier_nit": parsed.supplier_id,
             "ubl_document_type": parsed.document_type,
@@ -3120,44 +3190,51 @@ class LeaseAccountingPipeline:
             )
             lines_df = lines_df.drop(columns=["is_credit_note"])
 
-        summary_df = summary_df[
-            [
-                "invoice_id",
-                "vendor",
-                "store",
-                "ceco",
-                "account",
-                "concept",
-                "rent_type",
-                "sell_cam",
-                "amount",
-                "gross_amount",
-                "discount_total",
-                "posting_discount_total",
-                "payable_rounding",
-                "vat_total",
-                "vat_vw",
-                "vat_vq",
-                "vw_percent",
-                "vq_percent",
-                "withholding_tax_amount",
-                "text",
-                "invoice_date",
-                "due_date",
-                "payment_terms_text",
-                "item_count_hint",
-                "invoice_line_items",
-                "invoice_discounts",
-                "posting_index",
-                "posting_count",
-                "support_split_index",
-                "support_split_factor",
-                "invoice_total",
-                "vat_status",
-                "ubl_document_type",
-                "is_credit_note",
-            ]
-        ].copy()
+        summary_columns = [
+            "invoice_id",
+            "vendor",
+            "store",
+            "ceco",
+            "account",
+            "concept",
+            "rent_type",
+            "sell_cam",
+            "amount",
+            "gross_amount",
+            "discount_total",
+            "posting_discount_total",
+            "payable_rounding",
+            "vat_total",
+            "vat_vw",
+            "vat_vq",
+            "vw_percent",
+            "vq_percent",
+            "withholding_tax_amount",
+            "text",
+            "invoice_date",
+            "due_date",
+            "payment_terms_text",
+            "item_count_hint",
+            "invoice_line_items",
+            "invoice_discounts",
+            "posting_index",
+            "posting_count",
+            "support_split_index",
+            "support_split_factor",
+            "invoice_total",
+            "vat_status",
+            "ubl_document_type",
+            "is_credit_note",
+            "profit_center",
+            "currency",
+            "document_type",
+        ]
+        summary_columns.extend(
+            column for column in [
+                "lucy_id", "barcode", "support_source_path", "contract_status_blocked"
+            ] if column in summary_df.columns
+        )
+        summary_df = summary_df[summary_columns].copy()
 
         return summary_df, headers_df, lines_df
 
@@ -3410,15 +3487,15 @@ class LeaseAccountingPipeline:
             max_length = min(max(len(value) for value in values) + 2, 40)
             worksheet.column_dimensions[column_cells[0].column_letter].width = max_length
 
-    def _safe_read_table(self, path: Path | None) -> pd.DataFrame:
+    def _safe_read_table(self, path: Path | None, dtype: type | None = None) -> pd.DataFrame:
         if path is None:
             return pd.DataFrame()
         if path.suffix.lower() == ".csv":
             try:
-                return pd.read_csv(path, sep=None, engine="python", encoding="utf-8-sig")
+                return pd.read_csv(path, sep=None, engine="python", encoding="utf-8-sig", dtype=dtype)
             except UnicodeDecodeError:
-                return pd.read_csv(path, sep=None, engine="python", encoding="latin1")
-        return pd.read_excel(path)
+                return pd.read_csv(path, sep=None, engine="python", encoding="latin1", dtype=dtype)
+        return pd.read_excel(path, dtype=dtype)
 
     def _best_effort_rename(self, columns: Iterable[str], expected: dict[str, list[str]]) -> dict[str, str]:
         normalized = {self._normalize_column_name(col): col for col in columns}
