@@ -1,6 +1,7 @@
 ﻿"""Proceso: búsqueda de cada factura del JSON por Invoice Number."""
 import re
 import time
+from datetime import datetime
 
 from playwright.sync_api import Error as PlaywrightError, Locator, Page, expect
 
@@ -20,6 +21,8 @@ OPEN_ATTEMPTS = 3
 OPEN_WAIT_MS = 10_000
 DETAIL_LOAD_TIMEOUT_MS = 60_000
 ROW_SELECT_WAIT_MS = 1_000
+MOVEMENT_TYPE = "FI"
+VENDOR_CODE_LENGTH = 10
 
 
 def invoice_number_filter(page: Page) -> Locator:
@@ -182,6 +185,45 @@ def open_result(page: Page, folio: str, page_number: int, row: int) -> None:
     raise RuntimeError(f"No se pudo abrir el detalle de la factura {folio}.")
 
 
+def select_movement_type(page: Page) -> None:
+    page.locator("#mov-type-dropdown").locator("[class*='indicatorContainer']").click()
+    page.get_by_text(MOVEMENT_TYPE, exact=True).click()
+
+
+def select_document_type(page: Page, document_type: str) -> None:
+    dropdown = page.locator("#documents-document-type-dropdown")
+    dropdown.locator("[class*='indicatorContainer']").click()
+    # El id de las opciones de react-select es dinámico; se elige por texto.
+    page.locator("[id^='react-select-'][id*='-option-']").filter(has_text=document_type).first.click()
+
+
+def format_invoice_date(value: str) -> str:
+    return datetime.fromisoformat(value).strftime("%d-%m-%Y")
+
+
+def fill_document_data(page: Page, invoice: dict) -> None:
+    """Pasos grabados en la validación del documento: valida datos contra el JSON y guarda."""
+    part = invoice["partes"][0]
+    vendor_code = str(part["vendor"]).strip().zfill(VENDOR_CODE_LENGTH)
+    document_type = part["tipo_documento"]
+
+    select_movement_type(page)
+    expect(page.get_by_role("textbox", name=vendor_code)).to_have_value(vendor_code)
+    select_document_type(page, document_type)
+    page.get_by_role("button", name="Continue").click()
+
+    expect(page.locator("#documents-document-type-dropdown")).to_contain_text(document_type)
+    invoice_date = page.locator(".react-datepicker__input-container > input").first
+    expect(invoice_date).to_be_visible()
+    expect(invoice_date).to_have_value(format_invoice_date(part["fecha_factura"]))
+    document_number = page.locator("#q1-text-input-NUMDOC")
+    expect(document_number).to_be_visible()
+    expect(document_number).to_have_value(get_folio(invoice))
+
+    select_movement_type(page)
+    page.get_by_role("button", name="Save Document").click()
+
+
 def validate_invoice(page: Page, bundle: InvoiceBundle, invoice: dict) -> str:
     folio = get_folio(invoice)
     ensure_document_list(page)
@@ -190,7 +232,7 @@ def validate_invoice(page: Page, bundle: InvoiceBundle, invoice: dict) -> str:
     status = status_for_results(len(matches))
     if status == INVOICE_VALIDATED:
         open_result(page, folio, *matches[0])
-        # TODO: siguientes pasos dentro de la factura (movement type, vendor, document class, etc.).
-        back_to_list(page)
+        fill_document_data(page, invoice)
+        ensure_document_list(page)
     mark_invoice(bundle, invoice, status, len(matches))
     return status
