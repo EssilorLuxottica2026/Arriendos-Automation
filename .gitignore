@@ -41,6 +41,7 @@ data/macro_export/
 scratch/
 tmp_output/
 instance/
+bot-process/cache/
 
 # Legacy runtime folders from older versions
 output/

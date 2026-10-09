@@ -1,66 +1,59 @@
-"""Bot Lucy: automatización grabada con Playwright (flujo parcial).
+﻿"""Bot Lucy: orquestador principal.
 
-Credenciales (LUCY_USERNAME, LUCY_PASSWORD) desde variables de entorno o
-desde el archivo bot-process/.env (ignorado por git).
+1. Toma el ZIP más reciente del bot (``bot_single_vendor_*.zip``) de la carpeta de descargas
+   y lo extrae a ``bot-process/cache/`` (ahí se guarda el avance de cada factura).
+2. Ejecuta un paso por cada factura pendiente del JSON. Antes de cada paso se valida que la
+   pantalla y la sesión sigan activas; si no, se reabre el navegador y/o se vuelve a iniciar sesión.
+
+Configuración (LUCY_LOGIN_URL, LUCY_USERNAME, LUCY_PASSWORD, LUCY_COMPANY_CODE y opcionalmente
+LUCY_BUNDLE_DIR) desde variables de entorno o desde bot-process/.env o el .env de la raíz.
 """
-import os
-import re
+import sys
 from pathlib import Path
+from typing import Optional
 
 from playwright.sync_api import Playwright, sync_playwright
 
-LUCY_LOGIN_URL = "https://lucy-frontend-nf4ebt4lna-ew.a.run.app/login"
-ENV_FILE = Path(__file__).with_name(".env")
+# Permite importar el paquete ``lucy`` aunque el script se cargue por ruta (p. ej. desde web.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from lucy.browser import BotSession, close_browser  # noqa: E402
+from lucy.bundle import InvoiceBundle, load_bundle  # noqa: E402
+from lucy.config import get_bundle_dir, get_credentials, get_login_url  # noqa: E402
+from lucy.processes import build_steps  # noqa: E402
+from lucy.session import run_step  # noqa: E402
 
 
-def load_env(path: Path = ENV_FILE) -> None:
-    if not path.is_file():
+def run(playwright: Playwright, bundle: InvoiceBundle, headless: bool = False) -> None:
+    steps = build_steps(bundle)
+    print(f"Bundle: {bundle.directory} | facturas pendientes: {len(steps)}")
+    if not steps:
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+    session = BotSession(
+        playwright=playwright,
+        credentials=get_credentials(),
+        login_url=get_login_url(),
+        headless=headless,
+    )
+    failures = []
+    try:
+        for name, step in steps:
+            try:
+                run_step(session, name, step)
+            except Exception as exc:  # noqa: BLE001 - una factura fallida no detiene las demás
+                failures.append(f"{name}: {type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}")
+                print(f"[{name}] ERROR {failures[-1]}")
+    finally:
+        close_browser(session)
+    if failures:
+        raise RuntimeError("Facturas con error (quedan pendientes): " + " | ".join(failures))
 
 
-def run(playwright: Playwright, headless: bool = False) -> None:
-    load_env()
-    username = os.environ["LUCY_USERNAME"]
-    password = os.environ["LUCY_PASSWORD"]
-
-    browser = playwright.chromium.launch(headless=headless)
-    context = browser.new_context()
-    page = context.new_page()
-
-    page.goto(LUCY_LOGIN_URL)
-    page.get_by_role("textbox", name="Username").click()
-    page.get_by_role("textbox", name="Username").fill(username)
-    page.get_by_role("textbox", name="password").click()
-    page.get_by_role("textbox", name="password").fill(password)
-    page.get_by_role("button", name="LOGIN", exact=True).click()
-
-    page.get_by_role("link", name="Invoice Management").click()
-    page.locator(".css-1d2ztni-indicatorContainer").first.click()
-    page.locator("#react-select-3-option-0").click()
-    page.locator("div").filter(has_text=re.compile(r"^Select\.\.\.$")).nth(3).click()
-    page.locator("#react-select-6-input").fill("8140")
-    page.get_by_text("8140-GMO Colombia", exact=True).click()
-    page.get_by_role("button", name="Search Documents").click()
-
-    page.locator('[id="91-Barcode"]').click()
-    page.locator('[id="91-Barcode"]').fill("8")
-
-    # TODO: continuar el flujo grabado.
-
-    context.close()
-    browser.close()
-
-
-def main(headless: bool = False) -> None:
+def main(headless: bool = False, bundle_path: Optional[str] = None) -> None:
+    bundle = load_bundle(get_bundle_dir(), Path(bundle_path) if bundle_path else None)
     with sync_playwright() as playwright:
-        run(playwright, headless=headless)
+        run(playwright, bundle, headless=headless)
 
 
 if __name__ == "__main__":
-    main()
+    main(bundle_path=sys.argv[1] if len(sys.argv) > 1 else None)
