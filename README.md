@@ -52,14 +52,31 @@ two phases:
    **Search Documents**, and searches every invoice of the run plus every
    waiting invoice (deduplicated by folio and vendor, excluding Validation
    duplicates) by Invoice Number, checking exact matches across all pages.
-   - One match: the bot enters the invoice (click + double-click) and the
-     invoice leaves the waiting list as `completada_interactive_export`.
+   - One match: the bot enters the invoice (click + double-click), selects
+     movement type FI and checks vendor code, document type, date and
+     document number against the control JSON. Then it sets
+     **Document Type Sap** = `KR - Registro de Factura no PO`, reads
+     **Total VAT Amount** to choose **Vat Code** (`> 0` →
+     `VQ - IVA Compra Servicios 19% - Gasto`; `0` →
+     `VW - IVA Descontable Compras Bienes y Servicios 19%`) and sets
+     **Payment Terms** = `_ - _`. After checking every field again it clicks
+     **Export** → **Import csv template**, uploads the part-1 Allocated Costs
+     CSV (from the run bundle or the archived waiting-list copy) and waits for
+     `Balance:0`. **Save Document is never clicked.** On success the invoice
+     leaves the waiting list as `completada_interactive_export`.
    - No match: a waiting invoice stays in the list; an invoice not seen in
      Validation is added as `no_reflejada` and retried in both phases later.
    - Multiple matches: nothing is opened; it leaves the list as
      `duplicada_revision_manual`.
-   - Found but could not be opened: stays (or is added as
-     `error_interactive_export`) and is retried in Interactive Export.
+   - Found but could not be completed (open, field checks, selections or CSV
+     import failed): stays (or is added as `error_interactive_export`) and is
+     retried in Interactive Export.
+
+Lucy's own notifications (`[data-testid="notification"]`) are captured while
+an invoice is open, in both phases. A notification of type `fail` or `error`
+stops that invoice and its text is saved as the error in the waiting list; any
+other notification is only logged. If a step fails for another reason (for
+example a timeout), any Lucy error message is appended to the saved error.
 
 Results are also written to `validacion_lucy` and `interactive_export_lucy`
 in the extracted control JSON of the current run.

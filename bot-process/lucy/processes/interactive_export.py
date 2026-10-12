@@ -18,7 +18,9 @@ from ..history import (
     upsert_waiting_invoice,
 )
 from ..logging import log
+from ..notifications import failure_message
 from ..plan import WorkItem
+from .export_document import complete_export_document
 from .invoice_management import company_code_pattern, search_documents, wait_for_document_list
 from .invoice_validation import (
     filter_by_invoice_number,
@@ -28,10 +30,10 @@ from .invoice_validation import (
     wait_for_results_count,
 )
 
-EXPORT_FOUND = "Interactive Export: invoice opened"
+EXPORT_FOUND = "Interactive Export: CSV imported (not saved)"
 EXPORT_NOT_FOUND = "Interactive Export: invoice not found"
 EXPORT_DUPLICATED = "Interactive Export: invoice number duplicated"
-EXPORT_NOT_OPENED = "Interactive Export: found but not opened"
+EXPORT_NOT_COMPLETED = "Interactive Export: found but not completed"
 
 MENU_TEXT = "INTERACTIVE EXPORT"
 # Posición del control "Select..." de compañía según la grabación de Lucy; solo se usa si
@@ -185,7 +187,7 @@ def update_waiting_list(item: WorkItem, status: str, matches: int, error: Option
     in_list = record_interactive_export_result(item.invoice, status, matches, error)
     if status == EXPORT_FOUND:
         if close_waiting_invoice(item.invoice, CLOSED_COMPLETED):
-            log(f"[{folio}] Retirada de la lista de espera: proceso completado en Interactive Export.")
+            log(f"[{folio}] Retirada de la lista de espera: CSV importado en Interactive Export.")
     elif status == EXPORT_DUPLICATED:
         if close_waiting_invoice(item.invoice, CLOSED_DUPLICATED):
             log(f"[{folio}] Retirada de la lista de espera para revisión manual (duplicada).")
@@ -193,7 +195,7 @@ def update_waiting_list(item: WorkItem, status: str, matches: int, error: Option
         log(f"[{folio}] Sigue en lista de espera (motivo: {item.reason or 'actualizado en esta corrida'}).")
     else:
         # No está en la lista: no apareció en Validation en esta corrida.
-        reason = REASON_EXPORT_ERROR if status == EXPORT_NOT_OPENED else REASON_NOT_REFLECTED
+        reason = REASON_EXPORT_ERROR if status == EXPORT_NOT_COMPLETED else REASON_NOT_REFLECTED
         upsert_waiting_invoice(item.bundle, item.invoice, reason, status, error, new_attempt=True)
         record_interactive_export_result(item.invoice, status, matches, error)
         log(f"[{folio}] Agregada a la lista de espera (motivo: {reason}); se reintentará en futuras corridas.")
@@ -217,9 +219,11 @@ def search_in_interactive_export(page: Page, state: ExportListState, item: WorkI
     if status == EXPORT_FOUND:
         try:
             open_export_result(page, state, folio, *matches[0])
+            complete_export_document(page, item)
         except Exception as exc:
-            error = f"{type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}"
-            save_export_result(item, EXPORT_NOT_OPENED, len(matches), error)
+            error = failure_message(page, exc)
+            log(f"[{folio}] No se pudo completar en INTERACTIVE EXPORT; queda en lista de espera: {error}.")
+            save_export_result(item, EXPORT_NOT_COMPLETED, len(matches), error)
             raise
     elif status == EXPORT_DUPLICATED:
         log(f"[{folio}] Folio duplicado en INTERACTIVE EXPORT; no se abrió ningún registro.")

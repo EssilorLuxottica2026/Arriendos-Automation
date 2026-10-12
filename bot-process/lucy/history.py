@@ -4,9 +4,9 @@ Motivos de espera:
 - ``validada``: se encontró y completó en Validation; espera reflejarse en Interactive Export.
 - ``error_validacion``: se encontró en Validation pero no se pudo completar.
 - ``no_reflejada``: no apareció ni en Validation ni en Interactive Export.
-- ``error_interactive_export``: apareció en Interactive Export pero no se pudo entrar.
+- ``error_interactive_export``: apareció en Interactive Export pero no se pudo completar.
 
-Una factura sale de la lista al entrar a ella en Interactive Export o al detectarse duplicada.
+Una factura sale de la lista al importar su CSV en Interactive Export o al detectarse duplicada.
 """
 import hashlib
 import json
@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from .bundle import InvoiceBundle, get_folio
+from .bundle import InvoiceBundle, bundle_allocated_costs_csv, get_folio
 from .config import HISTORY_DIR
 
 HISTORY_PATH = HISTORY_DIR / "validation_history.json"
@@ -90,16 +90,12 @@ def _copy_allocated_costs(
     key: str,
 ) -> list[dict]:
     archived_files = []
-    bundle_root = bundle.directory.resolve()
     invoice_dir = history_dir / key
 
     for part_index, part in enumerate(invoice.get("partes", []), start=1):
-        relative_path = part.get("allocated_costs") or (part.get("csv") or {}).get("allocated_costs")
-        if not relative_path:
+        source = bundle_allocated_costs_csv(bundle, part)
+        if source is None:
             continue
-        source = (bundle.directory / relative_path).resolve()
-        if not source.is_relative_to(bundle_root):
-            raise ValueError(f"Ruta CSV fuera del paquete de control: {relative_path}.")
         if not source.is_file():
             raise FileNotFoundError(f"No existe el CSV Allocated Costs requerido: {source}.")
         target = invoice_dir / f"parte_{part_index}_{source.name}"
@@ -209,6 +205,23 @@ def close_waiting_invoice(
     })
     _write_history(history_path, history)
     return True
+
+
+def archived_allocated_costs_csv(
+    invoice: dict,
+    part_number,
+    *,
+    history_path: Path = HISTORY_PATH,
+) -> Optional[Path]:
+    """Copia archivada del CSV Allocated Costs de una parte; ``None`` si no existe en el historial."""
+    record = _load_history(history_path)["facturas"].get(invoice_key(invoice))
+    for archived in (record or {}).get("archivos_csv") or []:
+        if archived.get("tipo") == "allocated_costs" and archived.get("parte") == part_number:
+            path = (history_path.parent / archived["ruta"]).resolve()
+            if not path.is_relative_to(history_path.parent.resolve()):
+                raise ValueError(f"Ruta CSV fuera del historial: {archived['ruta']}.")
+            return path
+    return None
 
 
 def load_waiting_list(history_path: Path = HISTORY_PATH) -> list[dict]:
