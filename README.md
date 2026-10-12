@@ -13,6 +13,38 @@ python app.py
 
 Then open `http://127.0.0.1:5000`.
 
+Bot Lucy uses the installed Microsoft Edge Stable browser through Playwright's
+`msedge` channel. Microsoft Edge must be installed on the machine that runs the
+bot; Playwright and PyInstaller do not bundle Edge itself.
+
+For a standalone Windows build:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m PyInstaller --clean --noconfirm ArriendosAutomation.spec
+```
+
+The app's Python environment also runs Bot Lucy, so install the root
+`requirements.txt` there. No `playwright install` browser download is needed
+when using the installed Microsoft Edge channel. The standalone executable
+build bundles Playwright, but Microsoft Edge must still be installed on the
+target machine.
+
+When launched from the results screen, Bot Lucy streams its progress into the
+execution log panel. After reviewing a document, it leaves Edge open and waits
+for the user to choose **Cerrar Edge y finalizar**. The bot currently verifies
+the document fields but does not click **Save Document**; logs and the local
+control JSON explicitly report that the invoice was not saved.
+
+Invoices found in Lucy (including duplicates or a found invoice whose review
+fails) are also retained in
+`%LOCALAPPDATA%\Arriendos\bot-process\history\validation_history.json`, together
+with their control data and copies of their Allocated Costs CSVs. They remain
+marked as pending for the next processing step; invoices with zero exact
+matches are not added. The later step will define when these history entries
+are consumed or cleared.
+
 ## Required uploads
 
 - Invoices file: `.xlsx`, `.xls`, or `.csv`
@@ -57,11 +89,19 @@ macro database. Generic vendor rules must have no store or CECO: a percentage
 assigned to another location must not override the current location. VW and VQ
 are taken from the same rule (missing VQ is calculated as `1 - VW`), and the
 selected source is recorded in the execution log.
-For partial proration, the posting lines retain the nondeductible VAT remainder
-(`VAT_VQ`) with posting key `50` and `VQ`. They also use the rounded deductible
-VAT amount twice: posting key `40` with `VW`, and an additional posting key `50`
-with `VQ` for the same amount (`vat_vq_reversal`). The additional reversal does
-not replace the nondeductible VAT line.
+For partial proration, the posting lines use the rounded deductible VAT amount
+twice: posting key `40` with `VW`, and posting key `50` with `VQ` for the same
+amount (`vat_vq_reversal`). The nondeductible VAT remainder (`VAT_VQ`) is not
+exported as a separate posting line. This applies to all Allocated Costs CSVs,
+manual-style invoice CSVs and the allocations stored in the bot JSON.
+VAT totals and proration amounts remain available for invoice validation and
+traceability; the invoice total is unchanged. Credit notes invert the posting
+keys as usual.
+Both VAT adjustment lines inherit the concept abbreviation and text of the
+expense line with the largest absolute amount, rather than the invoice's
+generic RF/RV concept or the VAT account abbreviation. Equal amounts use the
+first expense line in source order. Invoices without item lines retain their
+expense line's original concept and text.
 Full VW or full VQ proration keeps the existing behavior without separate VAT
 adjustment lines.
 

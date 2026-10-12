@@ -3114,14 +3114,19 @@ class LeaseAccountingPipeline:
             if self._is_full_vw_prorate(row.get("vw_percent")) or self._is_full_vq_prorate(row.get("vq_percent")):
                 continue
 
+            principal_expense = max(expense_rows, key=lambda expense: abs(float(expense["amount"])))
+            vat_context = {
+                **base,
+                "concept": principal_expense["concept"],
+                "text": principal_expense["text"],
+            }
             if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
                 line_rows.append(
                     {
-                        **base,
+                        **vat_context,
                         "line_type": "vat_vw",
                         "posting_key": "40",
                         "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
                         "tax_code": "VW",
                         "amount": row["vat_vw"],
                     }
@@ -3130,11 +3135,10 @@ class LeaseAccountingPipeline:
             if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
                 line_rows.append(
                     {
-                        **base,
+                        **vat_context,
                         "line_type": "vat_vq_reversal",
                         "posting_key": "50",
                         "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
                         "tax_code": "VQ",
                         "amount": row["vat_vw"],
                     }

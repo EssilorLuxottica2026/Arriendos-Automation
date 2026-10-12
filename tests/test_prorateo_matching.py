@@ -171,31 +171,47 @@ class ProrateoMatchingTests(unittest.TestCase):
         self.pipeline.learning_dictionary = pd.DataFrame([{
             "concept": "INTERES", "account": "1537210003",
             "phrases": "INTERESES POR MORA", "text": "INTERES",
+        }, {
+            "concept": "ASEO", "account": "1537210003",
+            "phrases": "SERVICIO DE ASEO", "text": "ASEO",
         }])
         for document_type, expected_keys in [
             ("Invoice", ["40", "40", "50"]),
             ("CreditNote", ["50", "50", "40"]),
             ("DebitNote", ["40", "40", "50"]),
         ]:
-            for use_items in [True, False]:
-                with self.subTest(document_type=document_type, use_items=use_items):
+            for items, expected_concept in [
+                ([], "RV"),
+                ([{"description": "INTERESES POR MORA", "amount": 48979}], "INTERES"),
+                ([
+                    {"description": "SERVICIO DE ASEO", "amount": 10000},
+                    {"description": "INTERESES POR MORA", "amount": 38979},
+                ], "INTERES"),
+                ([
+                    {"description": "INTERESES POR MORA", "amount": 38979},
+                    {"description": "SERVICIO DE ASEO", "amount": 10000},
+                ], "INTERES"),
+                ([
+                    {"description": "INTERESES POR MORA", "amount": 10000},
+                    {"description": "SERVICIO DE ASEO", "amount": 38979},
+                ], "ASEO"),
+            ]:
+                with self.subTest(document_type=document_type, items=items):
                     output = pd.DataFrame([{
                         "invoice_id": "FESJ275196", "vendor": "800101493",
                         "store": "T004", "ceco": "6554", "profit_center": "6554",
-                        "account": "1537210003", "concept": "INTERES", "rent_type": "RV",
+                        "account": "1537210003", "concept": "RV", "rent_type": "RV",
                         "amount": 48979, "gross_amount": 48979,
                         "discount_total": 0, "posting_discount_total": 0,
                         "payable_rounding": 0, "invoice_total": 58285,
                         "vat_total": 9306, "vat_vw": 354, "vat_vq": 8952,
                         "vw_percent": 0.038, "vq_percent": 0.962,
                         "withholding_tax_amount": 0,
-                        "text": "10-2026 INTERES T004 6554",
+                        "text": "10-2026 RV T004 6554",
                         "invoice_date": pd.Timestamp("2026-10-06"),
                         "due_date": pd.NaT, "payment_terms_text": None,
                         "item_count_hint": 1, "ubl_document_type": document_type,
-                        "invoice_line_items": [
-                            {"description": "INTERESES POR MORA", "amount": 48979}
-                        ] if use_items else [],
+                        "invoice_line_items": items,
                         "invoice_discounts": [],
                     }])
                     summary, _, lines = self.pipeline._build_lucy_views(output)
@@ -213,15 +229,36 @@ class ProrateoMatchingTests(unittest.TestCase):
                             bundle.read("FESJ275196_allocated_costs.csv")
                             .decode("utf-8-sig").splitlines()
                         ))
-                    self.assertEqual([row["D/A$S/H"] for row in rows], expected_keys)
-                    base_amount = "-48979" if document_type == "CreditNote" and use_items else "48979"
-                    self.assertEqual([row["Imp$Amount"] for row in rows], [base_amount, "354", "354"])
-                    self.assertEqual([row["Cod_Iva$Vat Code"] for row in rows], ["VQ", "VW", "VQ"])
+                    expense_count = len(items) or 1
+                    self.assertEqual(
+                        [row["D/A$S/H"] for row in rows],
+                        [expected_keys[0]] * expense_count + expected_keys[1:],
+                    )
+                    base_amounts = [
+                        str(-item["amount"] if document_type == "CreditNote" else item["amount"])
+                        for item in items
+                    ] if items else ["48979"]
+                    self.assertEqual([row["Imp$Amount"] for row in rows], base_amounts + ["354", "354"])
+                    self.assertEqual(
+                        [row["Cod_Iva$Vat Code"] for row in rows],
+                        ["VQ"] * expense_count + ["VW", "VQ"],
+                    )
                     self.assertEqual(
                         [row["Conto$GL Account"] for row in rows],
-                        ["1537210003", "1149120011", "1149120011"],
+                        ["1537210003"] * expense_count + ["1149120011", "1149120011"],
                     )
-                    self.assertEqual([row["ProfitCenter$Profit Center"] for row in rows], ["6554"] * 3)
+                    self.assertEqual(
+                        [row["ProfitCenter$Profit Center"] for row in rows],
+                        ["6554"] * (expense_count + 2),
+                    )
+                    self.assertEqual(
+                        lines.tail(2)["concept"].tolist(),
+                        [expected_concept] * 2,
+                    )
+                    self.assertEqual(
+                        [row["Text$Text"] for row in rows[-2:]],
+                        [f"10-2026 {expected_concept} T004 6554"] * 2,
+                    )
 
 
 if __name__ == "__main__":
