@@ -2,26 +2,30 @@ import os
 from pathlib import Path
 
 import webview
+from PyInstaller.utils.hooks import collect_all
 
 
 project_root = Path(SPECPATH)
 webview_root = Path(webview.__file__).resolve().parent
 debug_build = os.environ.get("ARRIENDOS_BUILD_DEBUG") == "1"
+playwright_datas, playwright_binaries, playwright_hiddenimports = collect_all("playwright")
 
 datas = [
     (str(project_root / "templates"), "templates"),
     (str(project_root / "static"), "static"),
-]
+] + playwright_datas
+
+binaries = playwright_binaries
 
 a = Analysis(
     ["desktop_app.py"],
     pathex=[str(project_root / "src")],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=[
         "webview.platforms.winforms",
         "webview.platforms.edgechromium",
-    ],
+    ] + playwright_hiddenimports,
     hookspath=[str(webview_root / "__pyinstaller")],
     hooksconfig={},
     runtime_hooks=[],

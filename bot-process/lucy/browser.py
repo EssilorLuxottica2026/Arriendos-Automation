@@ -5,6 +5,9 @@ from typing import Optional
 from playwright.sync_api import Browser, BrowserContext, Error as PlaywrightError, Page, Playwright
 
 from .config import Credentials
+from .logging import log
+
+SLOW_MO_MS = 3_000
 
 
 @dataclass
@@ -19,7 +22,11 @@ class BotSession:
 
 
 def launch_browser(playwright: Playwright, headless: bool) -> Browser:
-    return playwright.chromium.launch(headless=headless)
+    return playwright.chromium.launch(
+        channel="msedge",
+        headless=headless,
+        slow_mo=SLOW_MO_MS,
+    )
 
 
 def open_context(browser: Browser) -> BrowserContext:
@@ -45,11 +52,13 @@ def is_page_open(session: BotSession) -> bool:
 def reopen_page(session: BotSession) -> None:
     if not is_browser_open(session):
         close_browser(session)
+        log("Lanzando Microsoft Edge Stable mediante Playwright.")
         session.browser = launch_browser(session.playwright, session.headless)
         session.context = open_context(session.browser)
     elif session.context is None:
         session.context = open_context(session.browser)
     session.page = open_page(session.context)
+    log("Pestaña de Microsoft Edge abierta.")
 
 
 def close_browser(session: BotSession) -> None:
