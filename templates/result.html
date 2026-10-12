@@ -102,6 +102,17 @@
                     </div>
                 </div>{% endif %}
 
+                <!-- BOT LUCY -->
+                <div class="download-card">
+                    <div class="download-info">
+                        <div class="download-title">Bot Lucy</div>
+                        <div class="download-desc">Ejecuta el bot Lucy con los resultados procesados.</div>
+                        <div id="bot-lucy-status" class="download-desc" role="status"></div>
+                    </div>
+                    <button type="button" id="run-bot-lucy" class="button-link primary" style="cursor: pointer; font-family: inherit;">Bot Lucy</button>
+                    <button type="button" id="finish-bot-lucy" class="button-link" style="display: none; cursor: pointer; font-family: inherit; margin-top: 8px;">Cerrar Edge y finalizar</button>
+                </div>
+
             </div>
         </section>
         {% endif %}
@@ -114,9 +125,9 @@
                     <div class="terminal-dot red"></div>
                     <div class="terminal-dot yellow"></div>
                     <div class="terminal-dot green"></div>
-                    <div class="terminal-title">pipeline.log</div>
+                    <div class="terminal-title">pipeline.log · Bot Lucy</div>
                 </div>
-                <div class="log-terminal">
+                <div class="log-terminal" id="execution-log">
                     {% for item in result.logs %}
                         {% set cls = "info-log" %}
                         {% if "Support File parsed" in item %}
@@ -145,5 +156,99 @@
             </div>
         </section>
     </main>
+    <script>
+        (function () {
+            var button = document.getElementById("run-bot-lucy");
+            var finishButton = document.getElementById("finish-bot-lucy");
+            var statusEl = document.getElementById("bot-lucy-status");
+            var logTerminal = document.getElementById("execution-log");
+            if (!button || !finishButton || !logTerminal) { return; }
+            var timer = null;
+            var logCursor = 0;
+
+            function setState(running, message) {
+                button.disabled = running;
+                button.style.opacity = running ? "0.6" : "";
+                statusEl.textContent = message || "";
+            }
+
+            function appendLog(message) {
+                var line = document.createElement("div");
+                line.className = "log-line " + (message.indexOf("ERROR") >= 0 ? "error-log" : "write-log");
+                line.textContent = message;
+                logTerminal.appendChild(line);
+                logTerminal.scrollTop = logTerminal.scrollHeight;
+            }
+
+            function poll() {
+                fetch("{{ url_for('bot_lucy_status') }}?after=" + logCursor)
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        (data.logs || []).forEach(appendLog);
+                        logCursor = data.total || logCursor;
+                        if (data.status === "running") {
+                            setState(true, "Bot Lucy está trabajando; logs en vivo.");
+                            finishButton.style.display = "none";
+                            return;
+                        }
+                        if (data.status === "holding") {
+                            setState(true, "Revisión terminada. Edge permanece abierto y la factura NO se guardó.");
+                            finishButton.style.display = "";
+                            return;
+                        }
+                        if (data.status === "finishing") {
+                            setState(true, "Cerrando Edge y liberando la ejecución...");
+                            finishButton.style.display = "none";
+                            return;
+                        }
+                        if (timer !== null) { clearInterval(timer); timer = null; }
+                        finishButton.style.display = "none";
+                        setState(false, data.status === "error"
+                            ? "Error: " + data.message
+                            : (data.status === "completed" ? "Bot Lucy finalizó." : ""));
+                    })
+                    .catch(function () { statusEl.textContent = "No se pudo consultar el estado del bot; se reintentará."; });
+            }
+
+            button.addEventListener("click", function () {
+                setState(true, "Iniciando Bot Lucy...");
+                finishButton.style.display = "none";
+                logCursor = 0;
+                appendLog("===== Inicio de ejecución de Bot Lucy =====");
+                fetch("{{ url_for('run_bot_lucy') }}", { method: "POST" })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                    .then(function (res) {
+                        if (!res.ok && res.data.status !== "running") {
+                            setState(false, res.data.message || "No se pudo iniciar el bot.");
+                            return;
+                        }
+                        setState(true, "Bot Lucy en ejecución; mostrando logs en vivo...");
+                        poll();
+                        timer = setInterval(poll, 2000);
+                    })
+                    .catch(function () { setState(false, "No se pudo iniciar el bot."); });
+            });
+
+            finishButton.addEventListener("click", function () {
+                finishButton.disabled = true;
+                statusEl.textContent = "Cerrando Edge y liberando la ejecución...";
+                fetch("{{ url_for('finish_bot_lucy') }}", { method: "POST" })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            finishButton.disabled = false;
+                            statusEl.textContent = res.data.message || "No se pudo finalizar la inspección.";
+                            return;
+                        }
+                        finishButton.style.display = "none";
+                        if (timer === null) { poll(); }
+                    })
+                    .catch(function () {
+                        finishButton.disabled = false;
+                        statusEl.textContent = "No se pudo solicitar el cierre de Edge.";
+                    });
+            });
+        })();
+    </script>
 </body>
 </html>

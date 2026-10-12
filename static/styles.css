@@ -2124,6 +2124,7 @@ body.modal-open {
 .log-line.split-log { color: #f472b6; }
 .log-line.write-log { color: #a7f3d0; }
 .log-line.info-log { color: #94a3b8; }
+.log-line.error-log { color: #fca5a5; }
 
 .back-action-container {
     text-align: center;

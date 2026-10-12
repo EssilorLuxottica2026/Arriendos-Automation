@@ -1,14 +1,17 @@
 from pathlib import Path
 from uuid import uuid4
+import importlib.util
 import json
 import re
 import shutil
+import threading
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -1004,3 +1007,79 @@ def download(filename: str):
         flash("Requested file does not exist.")
         return redirect(url_for("index"))
     return send_file(file_path, as_attachment=True)
+
+
+BOT_LUCY_SCRIPT = BASE_DIR / "bot-process" / "bot_lucy.py"
+_bot_lucy_state = {"status": "idle", "error": None, "logs": []}
+_bot_lucy_lock = threading.Lock()
+_bot_lucy_finish_event = threading.Event()
+
+
+def _append_bot_lucy_log(message: str) -> None:
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    with _bot_lucy_lock:
+        _bot_lucy_state["logs"].append(f"[{timestamp}] {message}")
+
+
+def _mark_bot_lucy_holding() -> None:
+    with _bot_lucy_lock:
+        _bot_lucy_state["status"] = "holding"
+
+
+def _run_bot_lucy_job() -> None:
+    try:
+        spec = importlib.util.spec_from_file_location("bot_lucy", BOT_LUCY_SCRIPT)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"No se pudo cargar el módulo del bot: {BOT_LUCY_SCRIPT.name}.")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.set_log_callback(_append_bot_lucy_log)
+        module.main(
+            hold_open=True,
+            finish_event=_bot_lucy_finish_event,
+            on_hold=_mark_bot_lucy_holding,
+        )
+    except Exception as exc:  # noqa: BLE001
+        message = f"{type(exc).__name__}: {exc}"
+        _append_bot_lucy_log(f"ERROR FATAL: {message}")
+        with _bot_lucy_lock:
+            _bot_lucy_state.update(status="error", error=message)
+    finally:
+        with _bot_lucy_lock:
+            if _bot_lucy_state["status"] != "error":
+                _bot_lucy_state["status"] = "completed"
+
+
+@app.route("/run-bot-lucy", methods=["POST"])
+def run_bot_lucy():
+    if not BOT_LUCY_SCRIPT.exists():
+        return jsonify(status="error", message="No se encontró bot-process/bot_lucy.py."), 404
+    with _bot_lucy_lock:
+        if _bot_lucy_state["status"] in {"running", "holding", "finishing"}:
+            return jsonify(status="running", message="El Bot Lucy ya está en ejecución."), 409
+        _bot_lucy_state.update(status="running", error=None, logs=[])
+        _bot_lucy_finish_event.clear()
+    threading.Thread(target=_run_bot_lucy_job, daemon=True).start()
+    return jsonify(status="started", message="Bot Lucy iniciado."), 202
+
+
+@app.route("/bot-lucy-status", methods=["GET"])
+def bot_lucy_status():
+    after = max(0, request.args.get("after", default=0, type=int))
+    with _bot_lucy_lock:
+        return jsonify(
+            status=_bot_lucy_state["status"],
+            message=_bot_lucy_state["error"],
+            logs=_bot_lucy_state["logs"][after:],
+            total=len(_bot_lucy_state["logs"]),
+        )
+
+
+@app.route("/finish-bot-lucy", methods=["POST"])
+def finish_bot_lucy():
+    with _bot_lucy_lock:
+        if _bot_lucy_state["status"] != "holding":
+            return jsonify(status=_bot_lucy_state["status"], message="El bot no está esperando inspección."), 409
+        _bot_lucy_state["status"] = "finishing"
+        _bot_lucy_finish_event.set()
+    return jsonify(status="finishing", message="Se solicitó cerrar Edge y finalizar la inspección.")
