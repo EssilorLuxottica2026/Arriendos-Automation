@@ -1,10 +1,12 @@
 """Bundle del bot: ZIP generado por la app con el JSON de control y los CSV.
 
-El ZIP se busca en la carpeta de descargas y se extrae a ``bot-process/cache/<nombre del zip>/``.
-La copia en caché es la copia de trabajo: ahí se guarda el resultado de cada factura, de modo
-que si el bot se interrumpe, la siguiente ejecución continúa con las facturas pendientes.
+El ZIP se busca en la carpeta de descargas y se extrae a la caché local del usuario, bajo
+``%LOCALAPPDATA%/Arriendos/bot-process/cache/<nombre del zip>/``. Cada ejecución borra la caché
+anterior y extrae el ZIP desde cero (puede haber varias corridas al día). Ahí se guarda el
+resultado de cada factura y se conserva hasta la siguiente ejecución.
 """
 import json
+import shutil
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -30,12 +32,16 @@ def find_latest_bundle(source_dir: Path) -> Path:
     return bundles[-1]
 
 
+def clear_cache(cache_dir: Path = CACHE_DIR) -> None:
+    """Borra las corridas anteriores: cada ejecución del bot empieza con una caché limpia."""
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+
+
 def extract_bundle(zip_path: Path, cache_dir: Path = CACHE_DIR) -> Path:
-    """Extrae el ZIP a la caché; si ya estaba extraído se reutiliza para conservar el avance."""
+    clear_cache(cache_dir)
     target = cache_dir / zip_path.stem
-    if (target / BUNDLE_JSON_NAME).is_file():
-        return target
-    target.mkdir(parents=True, exist_ok=True)
+    target.mkdir(parents=True)
     with zipfile.ZipFile(zip_path) as bundle:
         for member in bundle.namelist():
             destination = (target / member).resolve()
