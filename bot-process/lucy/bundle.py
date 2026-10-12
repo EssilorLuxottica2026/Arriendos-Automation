@@ -10,7 +10,7 @@ import shutil
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Optional
 
 from .config import BUNDLE_JSON_NAME, BUNDLE_PATTERN, CACHE_DIR
@@ -81,6 +81,29 @@ def get_invoices(bundle: InvoiceBundle) -> list[dict]:
 
 def get_folio(invoice: dict) -> str:
     return str(invoice["folio"]).strip()
+
+
+def allocated_costs_relative_path(part: dict) -> Optional[str]:
+    """Ruta relativa del CSV Allocated Costs de una parte.
+
+    En el JSON de control la ruta está en ``csv.allocated_costs``; ``allocated_costs`` a nivel de
+    parte es la lista de filas del CSV, no una ruta.
+    """
+    path = (part.get("csv") or {}).get("allocated_costs")
+    if isinstance(path, str) and path.strip():
+        # El JSON se genera en Windows con "\"; se normaliza para cualquier sistema.
+        return PureWindowsPath(path.strip()).as_posix()
+    return None
+
+
+def bundle_allocated_costs_csv(bundle: InvoiceBundle, part: dict) -> Optional[Path]:
+    relative_path = allocated_costs_relative_path(part)
+    if relative_path is None:
+        return None
+    source = (bundle.directory / relative_path).resolve()
+    if not source.is_relative_to(bundle.directory.resolve()):
+        raise ValueError(f"Ruta CSV fuera del paquete de control: {relative_path}.")
+    return source
 
 
 def is_ready_for_bot(invoice: dict) -> bool:

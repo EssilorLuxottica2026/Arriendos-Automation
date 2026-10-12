@@ -6,9 +6,10 @@ import unittest
 from unittest import mock
 
 from lucy import history
-from lucy.bundle import InvoiceBundle
+from lucy.bundle import InvoiceBundle, allocated_costs_relative_path
 from lucy.history import (
     CLOSED_COMPLETED,
+    REASON_EXPORT_ERROR,
     REASON_NOT_REFLECTED,
     REASON_VALIDATED,
     REASON_VALIDATION_ERROR,
@@ -17,11 +18,20 @@ from lucy.history import (
     record_interactive_export_result,
     upsert_waiting_invoice,
 )
+from lucy.notifications import error_messages
 from lucy.plan import WorkItem, build_export_items, build_validation_items
-from lucy.processes import interactive_export
+from lucy.processes import export_document, interactive_export
+from lucy.processes.export_document import (
+    VAT_CODE_WITH_VAT,
+    VAT_CODE_WITHOUT_VAT,
+    ZERO_BALANCE,
+    allocated_costs_csv,
+    vat_code_for,
+)
 from lucy.processes.interactive_export import (
     EXPORT_DUPLICATED,
     EXPORT_FOUND,
+    EXPORT_NOT_COMPLETED,
     EXPORT_NOT_FOUND,
     status_for_export_matches,
     update_waiting_list,
@@ -43,7 +53,13 @@ class BotLucyWaitingListTests(unittest.TestCase):
         self.invoice = {
             "folio": "F1",
             "vendor": "V1",
-            "partes": [{"parte": 1, "allocated_costs": "csv/F1.csv", "base": 100, "iva": 0}],
+            "partes": [{
+                "parte": 1,
+                "csv": {"allocated_costs": "csv\\F1.csv"},
+                "allocated_costs": [{"Imp$Amount": 100, "Cod_Iva$Vat Code": "VQ"}],
+                "base": 100,
+                "iva": 0,
+            }],
         }
         self.bundle = InvoiceBundle(
             directory=self.bundle_dir,
@@ -179,6 +195,67 @@ class BotLucyWaitingListTests(unittest.TestCase):
             update_waiting_list(WorkItem(self.invoice, self.bundle, None), EXPORT_DUPLICATED, 2)
 
         self.assertEqual(self.waiting(), [])
+
+    def test_failed_completion_in_export_keeps_invoice_waiting(self):
+        with self.patch_history_path():
+            update_waiting_list(WorkItem(self.invoice, self.bundle, None), EXPORT_NOT_COMPLETED, 1, "boom")
+
+        waiting = self.waiting()
+        self.assertEqual(waiting[0]["motivo_espera"], REASON_EXPORT_ERROR)
+        self.assertEqual(waiting[0]["error"], "boom")
+
+    def test_csv_path_comes_from_csv_section_not_from_rows(self):
+        self.assertEqual(allocated_costs_relative_path(self.invoice["partes"][0]), "csv/F1.csv")
+        self.assertIsNone(allocated_costs_relative_path({"allocated_costs": [{"Imp$Amount": 1}]}))
+
+    def test_export_csv_from_run_bundle(self):
+        path = allocated_costs_csv(WorkItem(self.invoice, self.bundle, None))
+
+        self.assertEqual(path, self.csv_path.resolve())
+
+    def test_export_csv_from_waiting_list_archive(self):
+        self.upsert(REASON_VALIDATED)
+        archived = partial(history.archived_allocated_costs_csv, history_path=self.history_path)
+
+        with mock.patch.object(export_document, "archived_allocated_costs_csv", archived):
+            path = allocated_costs_csv(WorkItem(self.invoice, None, REASON_VALIDATED))
+
+        self.assertTrue(path.is_relative_to(self.history_path.parent.resolve()))
+        self.assertEqual(path.read_text(encoding="utf-8"), "account,amount\n1,100\n")
+
+    def test_export_csv_missing_raises(self):
+        self.csv_path.unlink()
+
+        with self.assertRaises(FileNotFoundError):
+            allocated_costs_csv(WorkItem(self.invoice, self.bundle, None))
+
+
+class ExportDocumentRulesTests(unittest.TestCase):
+    def test_only_fail_or_error_notifications_are_errors(self):
+        notifications = [
+            {"text": "Saved", "type": "success"},
+            {"text": "Vat Code is not valid", "type": "fail"},
+            {"text": "Server error", "type": "error"},
+            {"text": "Check data", "type": "warning"},
+        ]
+
+        self.assertEqual(error_messages(notifications), ["Vat Code is not valid", "Server error"])
+    def test_vat_code_depends_on_total_vat_amount(self):
+        for value in ("0", "0,00", "0.00", " 0 "):
+            self.assertEqual(vat_code_for(value), VAT_CODE_WITHOUT_VAT, value)
+        for value in ("1950686", "1.950.686,00", "1,950,686.00", "0,01"):
+            self.assertEqual(vat_code_for(value), VAT_CODE_WITH_VAT, value)
+
+    def test_vat_code_rejects_unreadable_or_negative_amount(self):
+        for value in ("", "  ", "-5"):
+            with self.assertRaises(ValueError, msg=value):
+                vat_code_for(value)
+
+    def test_zero_balance_pattern(self):
+        for text in ("Balance:0", "Debit 10 Balance:0 Credit 10", "Balance: 0,00", "Balance:0.00"):
+            self.assertRegex(text, ZERO_BALANCE)
+        for text in ("Balance:0.5", "Balance:05", "Balance:10", "Balance:0,01", "Balance:-3"):
+            self.assertNotRegex(text, ZERO_BALANCE)
 
 
 if __name__ == "__main__":
