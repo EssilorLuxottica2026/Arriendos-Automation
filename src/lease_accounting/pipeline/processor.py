@@ -3127,19 +3127,6 @@ class LeaseAccountingPipeline:
                     }
                 )
 
-            if pd.notna(row["vat_vq"]) and abs(float(row["vat_vq"])) > 0:
-                line_rows.append(
-                    {
-                        **base,
-                        "line_type": "vat_vq",
-                        "posting_key": "50",
-                        "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
-                        "tax_code": "VQ",
-                        "amount": row["vat_vq"],
-                    }
-                )
-
             if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
                 line_rows.append(
                     {

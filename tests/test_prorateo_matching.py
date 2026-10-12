@@ -1,6 +1,8 @@
+import csv
 import tempfile
 import unittest
 from pathlib import Path
+import zipfile
 
 import pandas as pd
 
@@ -133,7 +135,7 @@ class ProrateoMatchingTests(unittest.TestCase):
         self.assertEqual(row["vw_percent"], 0.098)
         self.assertEqual(row["prorateo_source"], "macro")
 
-    def test_selected_t104_rate_preserves_vq_and_adds_equal_vw_reversal(self):
+    def test_selected_t104_rate_exports_only_vw_and_equal_vq_reversal(self):
         merged = self.merge([
             ("289666", "R003", "9264", 1.0, 0.0),
             ("289666", "T104", "8582", 0.098, 0.902),
@@ -156,13 +158,70 @@ class ProrateoMatchingTests(unittest.TestCase):
         summary, _, lines = self.pipeline._build_lucy_views(output)
         self.assertEqual(summary.iloc[0]["vat_vw"], 14855)
         self.assertEqual(summary.iloc[0]["vat_vq"], 136727)
-        self.assertEqual(lines["tax_code"].tolist(), ["VQ", "VQ", "VW", "VQ", "VQ"])
-        self.assertEqual(lines["posting_key"].tolist(), ["40", "40", "40", "50", "50"])
-        self.assertEqual(lines["amount"].tolist(), [725274, 72527, 14855, 136727, 14855])
+        self.assertEqual(lines["tax_code"].tolist(), ["VQ", "VQ", "VW", "VQ"])
+        self.assertEqual(lines["posting_key"].tolist(), ["40", "40", "40", "50"])
+        self.assertEqual(lines["amount"].tolist(), [725274, 72527, 14855, 14855])
         self.assertEqual(
             lines["line_type"].tolist(),
-            ["invoice_item", "invoice_item", "vat_vw", "vat_vq", "vat_vq_reversal"],
+            ["invoice_item", "invoice_item", "vat_vw", "vat_vq_reversal"],
         )
+
+    def test_t004_allocated_costs_omits_vat_remainder(self):
+        self.pipeline.VAT_ACCOUNT = "1149120011"
+        self.pipeline.learning_dictionary = pd.DataFrame([{
+            "concept": "INTERES", "account": "1537210003",
+            "phrases": "INTERESES POR MORA", "text": "INTERES",
+        }])
+        for document_type, expected_keys in [
+            ("Invoice", ["40", "40", "50"]),
+            ("CreditNote", ["50", "50", "40"]),
+            ("DebitNote", ["40", "40", "50"]),
+        ]:
+            for use_items in [True, False]:
+                with self.subTest(document_type=document_type, use_items=use_items):
+                    output = pd.DataFrame([{
+                        "invoice_id": "FESJ275196", "vendor": "800101493",
+                        "store": "T004", "ceco": "6554", "profit_center": "6554",
+                        "account": "1537210003", "concept": "INTERES", "rent_type": "RV",
+                        "amount": 48979, "gross_amount": 48979,
+                        "discount_total": 0, "posting_discount_total": 0,
+                        "payable_rounding": 0, "invoice_total": 58285,
+                        "vat_total": 9306, "vat_vw": 354, "vat_vq": 8952,
+                        "vw_percent": 0.038, "vq_percent": 0.962,
+                        "withholding_tax_amount": 0,
+                        "text": "10-2026 INTERES T004 6554",
+                        "invoice_date": pd.Timestamp("2026-10-06"),
+                        "due_date": pd.NaT, "payment_terms_text": None,
+                        "item_count_hint": 1, "ubl_document_type": document_type,
+                        "invoice_line_items": [
+                            {"description": "INTERESES POR MORA", "amount": 48979}
+                        ] if use_items else [],
+                        "invoice_discounts": [],
+                    }])
+                    summary, _, lines = self.pipeline._build_lucy_views(output)
+                    self.assertNotIn("vat_vq", lines["line_type"].tolist())
+                    self.assertEqual(summary.iloc[0]["vat_vq"], 8952)
+                    self.assertEqual(summary.iloc[0]["invoice_total"], 58285)
+                    export = self.pipeline._build_macro_lucy_export(
+                        summary, lines, pd.DataFrame(),
+                    )
+                    self.pipeline._write_allocated_costs_csv_bundle(
+                        summary, export, "allocated_costs.zip", "test",
+                    )
+                    with zipfile.ZipFile(self.pipeline.output_dir / "allocated_costs.zip") as bundle:
+                        rows = list(csv.DictReader(
+                            bundle.read("FESJ275196_allocated_costs.csv")
+                            .decode("utf-8-sig").splitlines()
+                        ))
+                    self.assertEqual([row["D/A$S/H"] for row in rows], expected_keys)
+                    base_amount = "-48979" if document_type == "CreditNote" and use_items else "48979"
+                    self.assertEqual([row["Imp$Amount"] for row in rows], [base_amount, "354", "354"])
+                    self.assertEqual([row["Cod_Iva$Vat Code"] for row in rows], ["VQ", "VW", "VQ"])
+                    self.assertEqual(
+                        [row["Conto$GL Account"] for row in rows],
+                        ["1537210003", "1149120011", "1149120011"],
+                    )
+                    self.assertEqual([row["ProfitCenter$Profit Center"] for row in rows], ["6554"] * 3)
 
 
 if __name__ == "__main__":
