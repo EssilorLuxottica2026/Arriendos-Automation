@@ -37,13 +37,32 @@ for the user to choose **Cerrar Edge y finalizar**. The bot currently verifies
 the document fields but does not click **Save Document**; logs and the local
 control JSON explicitly report that the invoice was not saved.
 
-Invoices found in Lucy (including duplicates or a found invoice whose review
-fails) are also retained in
-`%LOCALAPPDATA%\Arriendos\bot-process\history\validation_history.json`, together
-with their control data and copies of their Allocated Costs CSVs. They remain
-marked as pending for the next processing step; invoices with zero exact
-matches are not added. The later step will define when these history entries
-are consumed or cleared.
+The bot keeps a persistent waiting list in
+`%LOCALAPPDATA%\Arriendos\bot-process\history\validation_history.json`, with
+each invoice's control data and copies of its Allocated Costs CSVs. Each run has
+two phases:
+
+1. **Validation (Invoice Management)** searches new invoices plus waiting
+   invoices with reason `no_reflejada` or `error_validacion`. An invoice is
+   added to the waiting list only when it is found and its review completes
+   (`validada`) or fails (`error_validacion`). Not-found and duplicated
+   invoices are not added here; duplicates are removed from the list for
+   manual review.
+2. **INTERACTIVE EXPORT** filters by `LUCY_COMPANY_CODE`, clicks
+   **Search Documents**, and searches every invoice of the run plus every
+   waiting invoice (deduplicated by folio and vendor, excluding Validation
+   duplicates) by Invoice Number, checking exact matches across all pages.
+   - One match: the bot enters the invoice (click + double-click) and the
+     invoice leaves the waiting list as `completada_interactive_export`.
+   - No match: a waiting invoice stays in the list; an invoice not seen in
+     Validation is added as `no_reflejada` and retried in both phases later.
+   - Multiple matches: nothing is opened; it leaves the list as
+     `duplicada_revision_manual`.
+   - Found but could not be opened: stays (or is added as
+     `error_interactive_export`) and is retried in Interactive Export.
+
+Results are also written to `validacion_lucy` and `interactive_export_lucy`
+in the extracted control JSON of the current run.
 
 ## Required uploads
 

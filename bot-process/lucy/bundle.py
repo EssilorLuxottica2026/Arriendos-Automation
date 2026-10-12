@@ -16,6 +16,7 @@ from typing import Optional
 from .config import BUNDLE_JSON_NAME, BUNDLE_PATTERN, CACHE_DIR
 
 LUCY_RESULT_KEY = "validacion_lucy"
+INTERACTIVE_EXPORT_RESULT_KEY = "interactive_export_lucy"
 
 
 @dataclass
@@ -100,6 +101,15 @@ def get_pending_invoices(bundle: InvoiceBundle) -> list[dict]:
 
 def mark_invoice(bundle: InvoiceBundle, invoice: dict, status: str, matches: int) -> None:
     invoice[LUCY_RESULT_KEY] = {
+        "estado": status,
+        "coincidencias": matches,
+        "fecha": datetime.now(timezone.utc).isoformat(),
+    }
+    save_bundle(bundle)
+
+
+def mark_interactive_export(bundle: InvoiceBundle, invoice: dict, status: str, matches: int) -> None:
+    invoice[INTERACTIVE_EXPORT_RESULT_KEY] = {
         "estado": status,
         "coincidencias": matches,
         "fecha": datetime.now(timezone.utc).isoformat(),

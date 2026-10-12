@@ -2,7 +2,8 @@
 
 1. Toma el ZIP más reciente del bot (``bot_single_vendor_*.zip``) de la carpeta de descargas,
    borra la caché local de la corrida anterior y lo extrae a ``%LOCALAPPDATA%/Arriendos/bot-process/cache/``.
-2. Ejecuta un paso por cada factura pendiente del JSON. Antes de cada paso se valida que la
+2. Busca en Validation las facturas nuevas y las de la lista de espera que aún pueden aparecer
+   ahí; después busca todas en Interactive Export. Antes de cada paso se valida que la
    pantalla y la sesión sigan activas; si no, se reabre el navegador y/o se vuelve a iniciar sesión.
 
 Configuración (LUCY_LOGIN_URL, LUCY_USERNAME, LUCY_PASSWORD, LUCY_COMPANY_CODE y opcionalmente
@@ -19,13 +20,24 @@ from playwright.sync_api import Playwright, sync_playwright
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lucy.browser import BotSession, close_browser  # noqa: E402
-from lucy.bundle import InvoiceBundle, load_bundle  # noqa: E402
+from lucy.bundle import InvoiceBundle, get_pending_invoices, load_bundle  # noqa: E402
 from lucy.config import get_bundle_dir, get_credentials, get_login_url  # noqa: E402
-from lucy.history import load_pending_validation_history  # noqa: E402
+from lucy.history import load_waiting_list  # noqa: E402
 from lucy.logging import log  # noqa: E402
 from lucy.logging import set_log_callback  # noqa: E402
-from lucy.processes import build_steps  # noqa: E402
+from lucy.plan import build_export_items, build_validation_items  # noqa: E402
+from lucy.processes import build_export_steps, build_validation_steps  # noqa: E402
 from lucy.session import run_step  # noqa: E402
+
+
+def run_phase(session: BotSession, steps: list, failures: list[str]) -> None:
+    for name, step in steps:
+        try:
+            log(f"[{name}] Iniciando.")
+            run_step(session, name, step)
+        except Exception as exc:  # noqa: BLE001 - una factura fallida no detiene las demás
+            failures.append(f"{name}: {type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}")
+            log(f"[{name}] ERROR {failures[-1]}")
 
 
 def run(
@@ -37,11 +49,16 @@ def run(
     finish_event: Optional[Event] = None,
     on_hold: Optional[Callable[[], None]] = None,
 ) -> None:
-    steps = build_steps(bundle)
+    run_invoices = get_pending_invoices(bundle)
+    waiting = load_waiting_list()
+    validation_items = build_validation_items(bundle, run_invoices, waiting)
     log(f"Paquete cargado: {bundle.directory.name}")
-    log(f"Facturas pendientes para Lucy: {len(steps)}")
-    if not steps:
-        log("No hay facturas pendientes; no se abrió Edge.")
+    log(f"Facturas nuevas de esta corrida: {len(run_invoices)}.")
+    log(f"Facturas en lista de espera: {len(waiting)}.")
+    for record in waiting:
+        log(f"[{record['folio']}] En lista de espera (motivo: {record['motivo_espera']}).")
+    if not run_invoices and not waiting:
+        log("No hay facturas nuevas ni en lista de espera; no se abrió Edge.")
         return
     for invoice in bundle.data.get("facturas", []):
         folio = str(invoice.get("folio", "")).strip()
@@ -69,13 +86,17 @@ def run(
     log("Configuración cargada; se iniciará Microsoft Edge y el acceso a Lucy.")
     failures = []
     try:
-        for name, step in steps:
-            try:
-                log(f"[{name}] Iniciando revisión.")
-                run_step(session, name, step)
-            except Exception as exc:  # noqa: BLE001 - una factura fallida no detiene las demás
-                failures.append(f"{name}: {type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}")
-                log(f"[{name}] ERROR {failures[-1]}")
+        log(f"VALIDATION: {len(validation_items)} factura(s) por buscar.")
+        duplicated_keys: set[str] = set()
+        run_phase(session, build_validation_steps(validation_items, duplicated_keys), failures)
+
+        export_items = build_export_items(bundle, run_invoices, load_waiting_list(), duplicated_keys)
+        log(
+            f"INTERACTIVE EXPORT: {len(export_items)} factura(s) por buscar "
+            f"({len(duplicated_keys)} duplicada(s) en Validation excluida(s))."
+        )
+        run_phase(session, build_export_steps(export_items), failures)
+        log(f"Corrida terminada. Quedan {len(load_waiting_list())} factura(s) en lista de espera.")
     finally:
         if keep_open:
             input("Revisa el resultado en el navegador y presiona Enter para cerrarlo...")
@@ -102,8 +123,8 @@ def main(
     log(f"Buscando el paquete más reciente en {bundle_dir}.")
     bundle = load_bundle(bundle_dir, Path(bundle_path) if bundle_path else None)
     log(f"JSON de control cargado: {bundle.json_path.name}.")
-    pending_history = load_pending_validation_history()
-    log(f"Folios encontrados anteriormente y pendientes del siguiente paso: {len(pending_history)}.")
+    pending_history = load_waiting_list()
+    log(f"Facturas en lista de espera de corridas anteriores: {len(pending_history)}.")
     try:
         with sync_playwright() as playwright:
             run(

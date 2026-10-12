@@ -5,10 +5,17 @@ from datetime import datetime
 
 from playwright.sync_api import Error as PlaywrightError, Locator, Page, expect
 
-from ..bundle import InvoiceBundle, get_folio, mark_invoice
+from ..bundle import get_folio, mark_invoice
 from ..config import FILTER_TIMEOUT_MS
-from ..history import record_found_invoice
+from ..history import (
+    CLOSED_DUPLICATED,
+    REASON_VALIDATED,
+    REASON_VALIDATION_ERROR,
+    close_waiting_invoice,
+    upsert_waiting_invoice,
+)
 from ..logging import log
+from ..plan import WorkItem
 from .invoice_management import ensure_document_list, is_document_detail_open
 
 INVOICE_VALIDATED = "Invoice review complete (not saved)"
@@ -112,26 +119,37 @@ def first_page_button(page: Page) -> Locator:
     return pagination(page).locator("#icon-double-chevron-enabled").first
 
 
+def page_rows_signature(page: Page) -> list[str]:
+    # Barcode identifica cada fila en Invoice Management; si la pantalla no lo tiene
+    # (p. ej. Interactive Export), se usa el texto completo de las filas.
+    try:
+        return column_cells(page, BARCODE_COLUMN).all_inner_texts()
+    except RuntimeError:
+        return page.locator("#scroller tbody tr").all_inner_texts()
+
+
+def wait_for_rows_change(page: Page, previous: list[str], description: str) -> None:
+    deadline = time.monotonic() + FILTER_TIMEOUT_MS / 1000
+    while page_rows_signature(page) == previous:
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"La lista no cambió al pasar a {description}.")
+        page.wait_for_timeout(200)
+
+
 def go_to_next_page(page: Page) -> None:
     expected = str(current_page_number(page) + 1)
-    barcodes = column_cells(page, BARCODE_COLUMN)
-    previous = barcodes.all_inner_texts()
+    previous = page_rows_signature(page)
     next_page_button(page).click()
     expect(page_input(page)).to_have_value(expected)
-    deadline = time.monotonic() + FILTER_TIMEOUT_MS / 1000
-    while barcodes.all_inner_texts() == previous:
-        if time.monotonic() > deadline:
-            raise TimeoutError(f"La lista no cambió al pasar a la página {expected}.")
-        page.wait_for_timeout(200)
+    wait_for_rows_change(page, previous, f"la página {expected}")
 
 
 def go_to_page(page: Page, number: int) -> None:
     if current_page_number(page) > number:
-        barcodes = column_cells(page, BARCODE_COLUMN)
-        previous = barcodes.all_inner_texts()
+        previous = page_rows_signature(page)
         first_page_button(page).click()
         expect(page_input(page)).to_have_value("1")
-        expect(barcodes.first).not_to_have_text(previous[0])
+        wait_for_rows_change(page, previous, "la página 1")
     while current_page_number(page) < number:
         go_to_next_page(page)
 
@@ -254,36 +272,41 @@ def fill_document_data(page: Page, invoice: dict) -> None:
     )
 
 
-def validate_invoice(page: Page, bundle: InvoiceBundle, invoice: dict) -> str:
-    folio = get_folio(invoice)
+def validate_invoice(page: Page, item: WorkItem) -> str:
+    invoice = item.invoice
+    folio = item.folio
     parts = invoice.get("partes", [])
     log(
-        f"[{folio}] El control contiene {len(parts)} parte(s); "
+        f"[{folio}] Origen: {item.origin}. El control contiene {len(parts)} parte(s); "
         "la comprobación del detalle de Lucy utiliza la parte 1."
     )
-    log(f"[{folio}] Preparando listado y verificando el folio.")
+    log(f"[{folio}] Preparando listado de Validation y verificando el folio.")
     ensure_document_list(page)
     filter_by_invoice_number(page, folio)
     matches = find_exact_matches(page, folio) if wait_for_results_count(page, folio) else []
     status = status_for_results(len(matches))
     log(f"[{folio}] Coincidencias exactas encontradas: {len(matches)}.")
-    if matches:
-        record_found_invoice(bundle, invoice, status, new_attempt=True)
-        log(f"[{folio}] Folio e información de la factura guardados en el historial temporal.")
     if status == INVOICE_VALIDATED:
+        # Se registra como error antes de abrir: si el proceso se corta, la factura queda en espera.
+        upsert_waiting_invoice(item.bundle, invoice, REASON_VALIDATION_ERROR, "en_proceso", new_attempt=True)
+        log(f"[{folio}] Encontrada en Validation; agregada a la lista de espera.")
         try:
             open_result(page, folio, *matches[0])
             fill_document_data(page, invoice)
         except Exception as exc:
             error = f"{type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}"
-            record_found_invoice(bundle, invoice, "found_but_not_processed", error)
-            log(f"[{folio}] Se conserva en historial para el siguiente paso; revisión incompleta: {error}.")
+            upsert_waiting_invoice(item.bundle, invoice, REASON_VALIDATION_ERROR, "found_but_not_processed", error)
+            log(f"[{folio}] No se pudo completar en Validation; queda en lista de espera: {error}.")
             raise
-        record_found_invoice(bundle, invoice, "reviewed_not_saved")
+        upsert_waiting_invoice(item.bundle, invoice, REASON_VALIDATED, status)
+        log(f"[{folio}] Validation completado; en lista de espera hasta reflejarse en Interactive Export.")
     elif status == INVOICE_DUPLICATED:
         log(f"[{folio}] Se detectaron duplicados; no se abrió ni modificó ningún registro.")
+        if close_waiting_invoice(invoice, CLOSED_DUPLICATED):
+            log(f"[{folio}] Retirada de la lista de espera para revisión manual.")
     else:
-        log(f"[{folio}] No se encontró coincidencia; el listado queda visible en Edge.")
-    mark_invoice(bundle, invoice, status, len(matches))
-    log(f"[{folio}] Resultado escrito solo en el JSON extraído para esta ejecución: {status}.")
+        log(f"[{folio}] No aparece en Validation; se buscará en Interactive Export.")
+    if item.bundle is not None:
+        mark_invoice(item.bundle, invoice, status, len(matches))
+        log(f"[{folio}] Resultado escrito solo en el JSON extraído para esta ejecución: {status}.")
     return status
