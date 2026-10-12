@@ -15,6 +15,7 @@ from ..history import (
     upsert_waiting_invoice,
 )
 from ..logging import log
+from ..notifications import arm_notification_observer, check_lucy_errors, failure_message
 from ..plan import WorkItem
 from .invoice_management import ensure_document_list, is_document_detail_open
 
@@ -251,6 +252,7 @@ def fill_document_data(page: Page, invoice: dict) -> None:
     log(f"[{get_folio(invoice)}] Vendor confirmado.")
     select_document_type(page, document_type)
     page.get_by_role("button", name="Continue").click()
+    check_lucy_errors(page, get_folio(invoice), "pulsar Continue")
     log(f"[{get_folio(invoice)}] Continuó al detalle contable para comprobar los campos.")
 
     expect(page.locator("#documents-document-type-dropdown")).to_contain_text(document_type)
@@ -292,9 +294,12 @@ def validate_invoice(page: Page, item: WorkItem) -> str:
         log(f"[{folio}] Encontrada en Validation; agregada a la lista de espera.")
         try:
             open_result(page, folio, *matches[0])
+            arm_notification_observer(page)
+            log(f"[{folio}] Observador de mensajes de Lucy activo.")
             fill_document_data(page, invoice)
+            check_lucy_errors(page, folio, "revisar el detalle en Validation")
         except Exception as exc:
-            error = f"{type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}"
+            error = failure_message(page, exc)
             upsert_waiting_invoice(item.bundle, invoice, REASON_VALIDATION_ERROR, "found_but_not_processed", error)
             log(f"[{folio}] No se pudo completar en Validation; queda en lista de espera: {error}.")
             raise
