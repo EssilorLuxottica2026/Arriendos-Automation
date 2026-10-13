@@ -30,7 +30,7 @@ from .invoice_validation import (
     wait_for_results_count,
 )
 
-EXPORT_FOUND = "Interactive Export: CSV imported (not saved)"
+EXPORT_FOUND = "Interactive Export: CSV imported and reviewed (not saved)"
 EXPORT_NOT_FOUND = "Interactive Export: invoice not found"
 EXPORT_DUPLICATED = "Interactive Export: invoice number duplicated"
 EXPORT_NOT_COMPLETED = "Interactive Export: found but not completed"
@@ -187,7 +187,7 @@ def update_waiting_list(item: WorkItem, status: str, matches: int, error: Option
     in_list = record_interactive_export_result(item.invoice, status, matches, error)
     if status == EXPORT_FOUND:
         if close_waiting_invoice(item.invoice, CLOSED_COMPLETED):
-            log(f"[{folio}] Retirada de la lista de espera: CSV importado en Interactive Export.")
+            log(f"[{folio}] Retirada de la lista de espera: CSV importado y revisado en Interactive Export.")
     elif status == EXPORT_DUPLICATED:
         if close_waiting_invoice(item.invoice, CLOSED_DUPLICATED):
             log(f"[{folio}] Retirada de la lista de espera para revisión manual (duplicada).")
@@ -201,10 +201,16 @@ def update_waiting_list(item: WorkItem, status: str, matches: int, error: Option
         log(f"[{folio}] Agregada a la lista de espera (motivo: {reason}); se reintentará en futuras corridas.")
 
 
-def save_export_result(item: WorkItem, status: str, matches: int, error: Optional[str] = None) -> None:
+def save_export_result(
+    item: WorkItem,
+    status: str,
+    matches: int,
+    error: Optional[str] = None,
+    allocated_cost_summary: Optional[dict] = None,
+) -> None:
     update_waiting_list(item, status, matches, error)
     if item.bundle is not None:
-        mark_interactive_export(item.bundle, item.invoice, status, matches)
+        mark_interactive_export(item.bundle, item.invoice, status, matches, allocated_cost_summary)
         log(f"[{item.folio}] Resultado de INTERACTIVE EXPORT escrito en el JSON extraído.")
 
 
@@ -216,10 +222,11 @@ def search_in_interactive_export(page: Page, state: ExportListState, item: WorkI
     matches = find_exact_matches(page, folio) if wait_for_results_count(page, folio) else []
     status = status_for_export_matches(len(matches))
     log(f"[{folio}] Coincidencias exactas en INTERACTIVE EXPORT: {len(matches)}.")
+    summary = None
     if status == EXPORT_FOUND:
         try:
             open_export_result(page, state, folio, *matches[0])
-            complete_export_document(page, item)
+            summary = complete_export_document(page, item)
         except Exception as exc:
             error = failure_message(page, exc)
             log(f"[{folio}] No se pudo completar en INTERACTIVE EXPORT; queda en lista de espera: {error}.")
@@ -229,5 +236,5 @@ def search_in_interactive_export(page: Page, state: ExportListState, item: WorkI
         log(f"[{folio}] Folio duplicado en INTERACTIVE EXPORT; no se abrió ningún registro.")
     else:
         log(f"[{folio}] No encontrada en INTERACTIVE EXPORT; aún no se refleja en Lucy.")
-    save_export_result(item, status, len(matches))
+    save_export_result(item, status, len(matches), allocated_cost_summary=summary)
     return status
