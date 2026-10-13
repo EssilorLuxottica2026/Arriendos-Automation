@@ -62,15 +62,30 @@ two phases:
      **Payment Terms** = `_ - _`. After checking every field again it clicks
      **Export** → **Import csv template**, uploads the part-1 Allocated Costs
      CSV (from the run bundle or the archived waiting-list copy) and waits for
-     `Balance:0`. **Save Document is never clicked.** On success the invoice
+     `Balance:0`. Before touching Lucy the CSV is checked against the control
+     JSON: S/H 40/50, positive amounts, 10-digit GL accounts, Vat Code, CeCo and
+     store equal to the part, a concept in every text, net of the lines (40 − 50)
+     equal to the base, and every 50 line offsetting a deductible-VAT `VW` line
+     on the same account (deductible VAT may not exceed the invoice VAT). After
+     `Balance:0` it checks that every CSV line appears in the Lucy grid with
+     the same S/H, amount, Vat Code, account, CeCo and text, and that
+     **Invoice Total Amount**, **Total Taxable Amount** and **Total VAT
+     Amount** match the control. The Allocated Cost summary
+     (`CostiRipartiti`) is always built from the CSV lines, with every concept
+     once: `MM-YYYY SIGLA1/SIGLA2 TIENDA CECO` (for example
+     `10-2026 INTERES/RV T004 6554`). If Lucy already has a value it must contain
+     all concepts and none repeated; if empty it is filled. The result is saved
+     in the extracted control JSON under `interactive_export_lucy.resumen_allocated_cost`
+     (`resumen`, `conceptos`, `origen`: `completado` or `ya_existia`). Finally it re-checks
+     `Balance:0` and Lucy errors. **Save Document is never clicked.** On success the invoice
      leaves the waiting list as `completada_interactive_export`.
    - No match: a waiting invoice stays in the list; an invoice not seen in
      Validation is added as `no_reflejada` and retried in both phases later.
    - Multiple matches: nothing is opened; it leaves the list as
      `duplicada_revision_manual`.
-   - Found but could not be completed (open, field checks, selections or CSV
-     import failed): stays (or is added as `error_interactive_export`) and is
-     retried in Interactive Export.
+   - Found but could not be completed (open, field checks, selections, CSV
+     import or Allocated Costs review failed): stays (or is added as
+     `error_interactive_export`) and is retried in Interactive Export.
 
 Lucy's own notifications (`[data-testid="notification"]`) are captured while
 an invoice is open, in both phases. A notification of type `fail` or `error`
