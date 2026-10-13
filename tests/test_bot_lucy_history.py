@@ -229,6 +229,17 @@ class BotLucyWaitingListTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             allocated_costs_csv(WorkItem(self.invoice, self.bundle, None))
 
+    def test_summary_is_saved_in_control_json(self):
+        from lucy.bundle import INTERACTIVE_EXPORT_RESULT_KEY, mark_interactive_export
+
+        summary = {"resumen": "10-2026 INTERES/RV T004 6554", "conceptos": ["INTERES", "RV"], "origen": "completado"}
+        with mock.patch("lucy.bundle.save_bundle") as save:
+            mark_interactive_export(self.bundle, self.invoice, EXPORT_FOUND, 1, summary)
+            self.assertEqual(self.invoice[INTERACTIVE_EXPORT_RESULT_KEY]["resumen_allocated_cost"], summary)
+            save.assert_called_once()
+            mark_interactive_export(self.bundle, self.invoice, EXPORT_NOT_COMPLETED, 1)
+            self.assertNotIn("resumen_allocated_cost", self.invoice[INTERACTIVE_EXPORT_RESULT_KEY])
+
 
 class ExportDocumentRulesTests(unittest.TestCase):
     def test_only_fail_or_error_notifications_are_errors(self):

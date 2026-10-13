@@ -131,10 +131,19 @@ def mark_invoice(bundle: InvoiceBundle, invoice: dict, status: str, matches: int
     save_bundle(bundle)
 
 
-def mark_interactive_export(bundle: InvoiceBundle, invoice: dict, status: str, matches: int) -> None:
-    invoice[INTERACTIVE_EXPORT_RESULT_KEY] = {
+def mark_interactive_export(
+    bundle: InvoiceBundle,
+    invoice: dict,
+    status: str,
+    matches: int,
+    allocated_cost_summary: Optional[dict] = None,
+) -> None:
+    result = {
         "estado": status,
         "coincidencias": matches,
         "fecha": datetime.now(timezone.utc).isoformat(),
     }
+    if allocated_cost_summary:
+        result["resumen_allocated_cost"] = allocated_cost_summary
+    invoice[INTERACTIVE_EXPORT_RESULT_KEY] = result
     save_bundle(bundle)

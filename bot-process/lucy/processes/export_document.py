@@ -1,4 +1,4 @@
-"""Proceso: completar una factura abierta en INTERACTIVE EXPORT e importar su CSV Allocated Costs.
+"""Proceso: completar una factura abierta en INTERACTIVE EXPORT, importar su CSV Allocated Costs y revisarlo.
 
 No pulsa Save Document: la factura queda abierta y sin guardar para revisión.
 """
@@ -19,6 +19,7 @@ from ..notifications import (
     error_messages,
 )
 from ..plan import WorkItem
+from .allocated_costs_review import check_before_import, review_allocated_costs
 from .invoice_validation import (
     VENDOR_CODE_LENGTH,
     format_invoice_date,
@@ -205,10 +206,12 @@ def import_allocated_costs(page: Page, folio: str, csv_path: Path) -> None:
     log(f"[{folio}] Balance:0 confirmado tras importar el CSV.")
 
 
-def complete_export_document(page: Page, item: WorkItem) -> None:
+def complete_export_document(page: Page, item: WorkItem) -> dict:
+    """Completa la factura y devuelve el resumen de Allocated Cost para registrarlo en el JSON."""
     folio = item.folio
     # Se resuelve antes de tocar la página: sin CSV no se modifica nada en Lucy.
     csv_path = allocated_costs_csv(item)
+    csv_rows = check_before_import(folio, item.invoice["partes"][0], csv_path)
 
     log(f"[{folio}] Esperando el detalle de la factura en INTERACTIVE EXPORT.")
     expect(page.locator("#mov-type-dropdown")).to_be_visible(timeout=DETAIL_LOAD_TIMEOUT_MS)
@@ -231,4 +234,6 @@ def complete_export_document(page: Page, item: WorkItem) -> None:
 
     import_allocated_costs(page, folio, csv_path)
     check_lucy_errors(page, folio, "importar el CSV")
+    summary = review_allocated_costs(page, folio, item.invoice, csv_rows, wait_for_zero_balance)
     log(f"[{folio}] Factura completada en INTERACTIVE EXPORT; Save Document NO se pulsó (sin guardar).")
+    return summary
