@@ -218,10 +218,12 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
   `copia_lucy`, and `compensacion_sap`. Unknown values remain JSON `null`;
   preparation never confirms a Lucy copy, SAP posting, or compensation.
 
-Only `single_vendor` is enabled. A folio with several postings for the same vendor
-keeps separate parts and CSVs. Folios distributed across multiple vendors retain
-their existing accounting exports but have `ruta: null`,
-`estado: "pendiente_ruta"`, and `lista_para_bot: false`. Missing invoice supports
+Only `single_vendor` is enabled for the bot. A folio with several postings for the
+same vendor keeps separate parts and CSVs. Folios distributed across multiple
+vendors, and folios uploaded as "XML para 2/3 tiendas" (percentage split, marked
+with `distribucion_porcentajes: true`), use `ruta: "multivendor"`, keep their
+existing accounting exports, and have `estado: "pendiente_ruta"` and
+`lista_para_bot: false` until the multivendor route is enabled. Missing invoice supports
 are reported as `pendiente_archivo`, also preventing bot execution.
 `preparada` confirms only the preparation step, not execution by the bot.
 
