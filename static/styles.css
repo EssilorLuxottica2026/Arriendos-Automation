@@ -1571,6 +1571,29 @@ body.modal-open {
     font-size: 0.76rem;
 }
 
+.split-vendor-input {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid #354359;
+    border-radius: 7px;
+    outline: 0;
+    color: var(--text-primary);
+    background: #0a121f;
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.split-vendor-input:focus {
+    border-color: #6c9ddd;
+    box-shadow: 0 0 0 3px rgba(108, 157, 221, 0.16);
+}
+
+.split-compensation-field {
+    margin-top: 12px;
+}
+
 .split-total-row {
     display: flex;
     align-items: center;

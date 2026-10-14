@@ -115,9 +115,29 @@
                                         <span>%</span>
                                     </span>
                                     <small data-allocation-preview>Por calcular</small>
+                                    <input
+                                        type="text"
+                                        class="split-vendor-input"
+                                        name="vendor_{{ idx }}_{{ part_index }}"
+                                        placeholder="Vendor archivo {{ part_index + 1 }}"
+                                        aria-label="Vendor del archivo {{ part_index + 1 }}"
+                                        autocomplete="off"
+                                    >
                                 </label>
                             {% endfor %}
                         </div>
+
+                        <label class="split-percentage-field split-compensation-field">
+                            <span>Vendor a compensar</span>
+                            <input
+                                type="text"
+                                class="split-vendor-input"
+                                name="compensation_vendor_{{ idx }}"
+                                placeholder="Vendor al que se compensa la factura"
+                                aria-label="Vendor a compensar de la factura {{ item.invoice_id }}"
+                                autocomplete="off"
+                            >
+                        </label>
 
                         <div class="split-total-row">
                             <span>Total asignado</span>
