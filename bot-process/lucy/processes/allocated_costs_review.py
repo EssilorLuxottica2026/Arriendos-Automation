@@ -28,6 +28,7 @@ CREDIT = "50"
 DEDUCTIBLE_VAT_CODE = "VW"
 CONCEPT_SEPARATOR = "/"
 PERIOD = re.compile(r"^\d{2}-\d{4}$")
+SPLIT_PERCENT = re.compile(r"^\d+(?:[.,]\d+)?%$")
 GL_ACCOUNT_FORMAT = re.compile(r"^\d{10}$")
 
 INVOICE_TOTAL_LABEL = "Invoice Total Amount"
@@ -94,12 +95,21 @@ def strip_suffix(text: str, suffix: str) -> str:
     return text
 
 
-def split_text(row: dict) -> tuple[str, str]:
-    """(periodo, concepto) del texto ``MM-YYYY CONCEPTO TIENDA CECO``; la tienda puede tener espacios."""
-    text = " ".join(clean(row.get(TEXT)).split())
+def split_period(text: str) -> tuple[str, str]:
+    """Separa ``MM-YYYY`` (y el porcentaje de reparto opcional, ``MM-YYYY 33%``) del resto del texto."""
     period, _, rest = text.partition(" ")
     if not PERIOD.match(period):
-        period, rest = "", text
+        return "", text
+    percent, _, after_percent = rest.partition(" ")
+    if SPLIT_PERCENT.match(percent):
+        return f"{period} {percent}", after_percent
+    return period, rest
+
+
+def split_text(row: dict) -> tuple[str, str]:
+    """(periodo, concepto) del texto ``MM-YYYY [NN%] CONCEPTO TIENDA CECO``; la tienda puede tener espacios."""
+    text = " ".join(clean(row.get(TEXT)).split())
+    period, rest = split_period(text)
     for tail in (line_cost_center(row), " ".join(clean(row.get(BRAND)).split())):
         rest = strip_suffix(rest, tail)
     return period, rest
@@ -139,9 +149,7 @@ def concept_summary(rows: list[dict]) -> str:
 
 def summary_concepts(summary: str, rows: list[dict]) -> list[str]:
     text = " ".join(summary.split())
-    period, _, rest = text.partition(" ")
-    if not PERIOD.match(period):
-        rest = text
+    _, rest = split_period(text)
     for tails in (unique(line_cost_center(row) for row in rows), unique(" ".join(clean(row.get(BRAND)).split()) for row in rows)):
         if len(tails) == 1:
             rest = strip_suffix(rest, tails[0])

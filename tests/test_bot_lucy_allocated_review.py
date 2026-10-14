@@ -45,6 +45,16 @@ ROWS = [
 
 
 class AllocatedCostsReviewTests(unittest.TestCase):
+    def test_split_percentage_after_period_is_not_part_of_concept(self):
+        rows = [
+            row("40", 48979, "VQ", "1537210004", "10-2026 33.33% INTERES T004 6554"),
+            row("40", 354, "VW", "1149120011", "10-2026 33.33% RV T004 6554"),
+        ]
+        self.assertEqual(line_concept(rows[0]), "INTERES")
+        summary = concept_summary(rows)
+        self.assertEqual(summary, "10-2026 33.33% INTERES/RV T004 6554")
+        self.assertEqual(summary_issues(summary, rows), [])
+
     def test_parse_amount_formats(self):
         for text, expected in (
             ("48979", "48979"),

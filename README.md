@@ -203,7 +203,13 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
 - `ruta`, `estado`, `lista_para_bot`, `documento_sap`, UTC processing/update
   dates, `error`, and `pasos_confirmados`.
 - `partes`: each posting's vendor, store (`tienda`), CeCo, profit center, base,
-  VAT, amount, currency, invoice date, and document type.
+  VAT, amount, currency, invoice date, and document type. Parts from an XML
+  uploaded as "XML para 2/3 tiendas" also carry `porcentaje_distribucion`
+  (for example `33.33`); it is `null` for invoices that are not split. The same
+  percentage is written right after the period in every line text
+  (`10-2026 33.33% RV T004 6554`); long concepts are shortened so the store and
+  CeCo always fit in the 50-character limit. Bot Lucy treats `MM-YYYY NN%` as
+  the period when reading concepts and building the Allocated Cost summary.
 - Each part links its copied support (`archivo_factura`), original source path,
   header CSV, Allocated Costs CSV, and manual-style invoice CSV.
   `allocated_costs` also contains the exact exported rows, without the internal

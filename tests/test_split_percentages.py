@@ -81,6 +81,40 @@ class SplitPercentageTests(unittest.TestCase):
         )
         self.assertEqual(result["total"].sum(), 100)
 
+    def test_split_percentage_is_written_after_period_in_text(self):
+        pipeline = LeaseAccountingPipeline("scratch")
+        row = {"support_split_factor": 3, "support_split_percent": 33.330000000000005}
+        label = pipeline._split_percent_label(row)
+        self.assertEqual(label, "33.33%")
+        self.assertEqual(
+            pipeline._build_text(pd.Timestamp("2026-10-01"), "RV", "T004", "6554", label),
+            "10-2026 33.33% RV T004 6554",
+        )
+        self.assertEqual(
+            pipeline._split_percent_label({"support_split_factor": 2, "support_split_percent": 60.0}),
+            "60%",
+        )
+        self.assertIsNone(
+            pipeline._split_percent_label({"support_split_factor": 1, "support_split_percent": 100.0})
+        )
+        self.assertEqual(
+            pipeline._build_text(pd.Timestamp("2026-10-01"), "RV", "T004", "6554"),
+            "10-2026 RV T004 6554",
+        )
+
+    def test_long_concept_is_trimmed_but_keeps_percentage_store_and_ceco(self):
+        pipeline = LeaseAccountingPipeline("scratch")
+        text = pipeline._build_text(
+            pd.Timestamp("2026-10-01"),
+            "CUOTA ADMINISTRACION ORDINARIA EXTRAORDINARIA",
+            "OFICINA PRINCIPAL",
+            "6554",
+            "33.34%",
+        )
+        self.assertLessEqual(len(text), pipeline.TEXT_MAX_LENGTH)
+        self.assertTrue(text.startswith("10-2026 33.34% CUOTA"))
+        self.assertTrue(text.endswith("OFICINA PRINCIPAL 6554"))
+
 
 if __name__ == "__main__":
     unittest.main()

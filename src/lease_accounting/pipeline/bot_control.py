@@ -67,6 +67,7 @@ def write_bot_control(
 
         part = {
             "parte": posting["posting_index"],
+            "porcentaje_distribucion": posting.get("support_split_percent"),
             "vendor": vendor or None,
             "tienda": posting.get("store"),
             "ceco": posting.get("ceco"),
