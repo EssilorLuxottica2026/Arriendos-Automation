@@ -21,11 +21,18 @@ from lucy.browser import BotSession, close_browser  # noqa: E402
 from lucy.bundle import InvoiceBundle, load_bundle  # noqa: E402
 from lucy.config import get_bundle_dir, get_credentials, get_login_url  # noqa: E402
 from lucy.processes import build_steps  # noqa: E402
+from lucy.processes.invoice_repost import build_repost_steps  # noqa: E402
 from lucy.session import run_step  # noqa: E402
 
 
-def run(playwright: Playwright, bundle: InvoiceBundle, headless: bool = False) -> None:
-    steps = build_steps(bundle)
+def run(
+    playwright: Playwright,
+    bundle: InvoiceBundle,
+    headless: bool = False,
+    repost_folios: Optional[list[str]] = None,
+    repost: bool = False,
+) -> None:
+    steps = build_repost_steps(bundle, repost_folios) if repost else build_steps(bundle)
     print(f"Bundle: {bundle.directory} | facturas pendientes: {len(steps)}")
     if not steps:
         return
@@ -49,11 +56,24 @@ def run(playwright: Playwright, bundle: InvoiceBundle, headless: bool = False) -
         raise RuntimeError("Facturas con error (quedan pendientes): " + " | ".join(failures))
 
 
-def main(headless: bool = False, bundle_path: Optional[str] = None) -> None:
+def main(
+    headless: bool = False,
+    bundle_path: Optional[str] = None,
+    repost: bool = False,
+    repost_folios: Optional[list[str]] = None,
+) -> None:
     bundle = load_bundle(get_bundle_dir(), Path(bundle_path) if bundle_path else None)
     with sync_playwright() as playwright:
-        run(playwright, bundle, headless=headless)
+        run(playwright, bundle, headless=headless, repost_folios=repost_folios, repost=repost)
 
 
 if __name__ == "__main__":
-    main(bundle_path=sys.argv[1] if len(sys.argv) > 1 else None)
+    # Uso: bot_lucy.py [zip] [--repost [FOLIO ...]]
+    args = sys.argv[1:]
+    repost_mode = "--repost" in args
+    if repost_mode:
+        index = args.index("--repost")
+        args, folio_args = args[:index], args[index + 1:]
+    else:
+        folio_args = []
+    main(bundle_path=args[0] if args else None, repost=repost_mode, repost_folios=folio_args or None)

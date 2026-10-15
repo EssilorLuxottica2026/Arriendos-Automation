@@ -25,17 +25,21 @@ MOVEMENT_TYPE = "FI"
 VENDOR_CODE_LENGTH = 10
 
 
-def invoice_number_filter(page: Page) -> Locator:
+def column_filter(page: Page, column: str) -> Locator:
     # El prefijo numérico del id es dinámico ("95-Invoice Number"); el sufijo es estable.
-    return page.locator(f"[id$='-{INVOICE_NUMBER_COLUMN}']")
+    return page.locator(f"[id$='-{column}']")
+
+
+def filter_by_column(page: Page, column: str, value: str) -> None:
+    # Se reutiliza el mismo input: el valor nuevo reemplaza al anterior.
+    field = column_filter(page, column)
+    expect(field).to_be_visible()
+    field.click()
+    field.fill(value)
 
 
 def filter_by_invoice_number(page: Page, folio: str) -> None:
-    # Se reutiliza el mismo input: el folio nuevo reemplaza al anterior.
-    field = invoice_number_filter(page)
-    expect(field).to_be_visible()
-    field.click()
-    field.fill(folio)
+    filter_by_column(page, INVOICE_NUMBER_COLUMN, folio)
 
 
 def get_results_count(page: Page) -> int:
@@ -54,7 +58,7 @@ def column_cells(page: Page, column: str) -> Locator:
     return page.locator(f"#scroller tbody tr td:nth-child({column_index + 1})")
 
 
-def wait_for_results_count(page: Page, folio: str) -> int:
+def wait_for_results_count(page: Page, folio: str, column: str = INVOICE_NUMBER_COLUMN) -> int:
     """Espera a que "N results" corresponda al filtro aplicado y devuelve N."""
     # Justo después de escribir, el conteo del folio anterior sigue en pantalla; se espera a que
     # las filas correspondan al folio nuevo, o a que "0 results" se mantenga estable.
@@ -69,11 +73,11 @@ def wait_for_results_count(page: Page, folio: str) -> int:
                 return 0
         else:
             zero_since = None
-            values = [text.strip() for text in column_cells(page, INVOICE_NUMBER_COLUMN).all_inner_texts()]
+            values = [text.strip() for text in column_cells(page, column).all_inner_texts()]
             if values and total >= len(values) and all(needle in v.casefold() for v in values):
                 return total
         page.wait_for_timeout(300)
-    raise TimeoutError(f"La lista no se actualizó con el filtro de Invoice Number '{folio}'.")
+    raise TimeoutError(f"La lista no se actualizó con el filtro de {column} '{folio}'.")
 
 
 def pagination(page: Page) -> Locator:
@@ -135,13 +139,15 @@ def is_exact_folio(value: str, folio: str) -> bool:
     return value.strip().casefold() == folio.strip().casefold()
 
 
-def find_exact_matches(page: Page, folio: str) -> list[tuple[int, int]]:
-    """Recorre todas las páginas y devuelve (página, fila) de cada Invoice Number exacto."""
+def find_exact_matches(
+    page: Page, folio: str, column: str = INVOICE_NUMBER_COLUMN
+) -> list[tuple[int, int]]:
+    """Recorre todas las páginas y devuelve (página, fila) de cada valor exacto de la columna."""
     # El filtro de Lucy es "contiene" (4092 también trae FE4092), por eso se compara cada fila.
     matches = []
     while True:
         page_number = current_page_number(page)
-        values = column_cells(page, INVOICE_NUMBER_COLUMN).all_inner_texts()
+        values = column_cells(page, column).all_inner_texts()
         matches += [(page_number, row) for row, value in enumerate(values) if is_exact_folio(value, folio)]
         if not has_next_page(page):
             return matches
