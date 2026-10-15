@@ -1,20 +1,19 @@
-﻿"""Bot Lucy: orquestador principal.
+"""Bot Lucy: orquestador principal.
 
 1. Toma el ZIP más reciente del bot (``bot_single_vendor_*.zip``) de la carpeta de descargas,
    borra la caché local de la corrida anterior y lo extrae a ``%LOCALAPPDATA%/Arriendos/bot-process/cache/``.
-2. Busca en Validation las facturas nuevas y las de la lista de espera que aún pueden aparecer
-   ahí; después busca todas en Interactive Export. Antes de cada paso se valida que la
-   pantalla y la sesión sigan activas; si no, se reabre el navegador y/o se vuelve a iniciar sesión.
+2. En el flujo normal, busca las facturas en Validation y después Interactive Export.
+   Con ``--repost``, ejecuta en su lugar el flujo de repost multi-vendor.
 
 Configuración (LUCY_LOGIN_URL, LUCY_USERNAME, LUCY_PASSWORD, LUCY_COMPANY_CODE y opcionalmente
 LUCY_BUNDLE_DIR) desde variables de entorno o desde bot-process/.env o el .env de la raíz.
 """
 import sys
-from threading import Event
 from pathlib import Path
+from threading import Event
 from typing import Callable, Optional
 
-from playwright.sync_api import Playwright, sync_playwright
+from playwright.sync_api import Page, Playwright, sync_playwright
 
 # Permite importar el paquete ``lucy`` aunque el script se cargue por ruta (p. ej. desde web.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -23,14 +22,18 @@ from lucy.browser import BotSession, close_browser  # noqa: E402
 from lucy.bundle import InvoiceBundle, get_pending_invoices, load_bundle  # noqa: E402
 from lucy.config import get_bundle_dir, get_credentials, get_login_url  # noqa: E402
 from lucy.history import load_waiting_list  # noqa: E402
-from lucy.logging import log  # noqa: E402
-from lucy.logging import set_log_callback  # noqa: E402
+from lucy.logging import log, set_log_callback  # noqa: E402
 from lucy.plan import build_export_items, build_validation_items  # noqa: E402
 from lucy.processes import build_export_steps, build_validation_steps  # noqa: E402
+from lucy.processes.invoice_repost import build_repost_steps  # noqa: E402
 from lucy.session import run_step  # noqa: E402
 
 
-def run_phase(session: BotSession, steps: list, failures: list[str]) -> None:
+def run_phase(
+    session: BotSession,
+    steps: list[tuple[str, Callable[[Page], None]]],
+    failures: list[str],
+) -> None:
     for name, step in steps:
         try:
             log(f"[{name}] Iniciando.")
@@ -44,38 +47,49 @@ def run(
     playwright: Playwright,
     bundle: InvoiceBundle,
     headless: bool = False,
+    repost_folios: Optional[list[str]] = None,
+    repost: bool = False,
     keep_open: bool = False,
     hold_open: bool = False,
     finish_event: Optional[Event] = None,
     on_hold: Optional[Callable[[], None]] = None,
 ) -> None:
     run_invoices = get_pending_invoices(bundle)
-    waiting = load_waiting_list()
-    validation_items = build_validation_items(bundle, run_invoices, waiting)
-    log(f"Paquete cargado: {bundle.directory.name}")
-    log(f"Facturas nuevas de esta corrida: {len(run_invoices)}.")
-    log(f"Facturas en lista de espera: {len(waiting)}.")
-    for record in waiting:
-        log(f"[{record['folio']}] En lista de espera (motivo: {record['motivo_espera']}).")
-    if not run_invoices and not waiting:
-        log("No hay facturas nuevas ni en lista de espera; no se abrió Edge.")
-        return
-    for invoice in bundle.data.get("facturas", []):
-        folio = str(invoice.get("folio", "")).strip()
-        result = invoice.get("validacion_lucy") or {}
-        if invoice.get("lista_para_bot") and not result.get("estado"):
-            for part in invoice.get("partes", []):
-                log(
-                    f"[{folio}] Detectada: vendor={part.get('vendor')}, "
-                    f"tienda={part.get('tienda')}, CECO={part.get('ceco')}, "
-                    f"base={part.get('base')}, IVA={part.get('iva')}, "
-                    f"importe={part.get('importe')}, soporte="
-                    f"{Path(part['archivo_factura']).name if part.get('archivo_factura') else 'no disponible'}."
-                )
-        elif not invoice.get("lista_para_bot"):
-            log(f"[{folio}] Omitida: no está marcada como lista para Lucy.")
-        elif result.get("estado"):
-            log(f"[{folio}] Omitida: ya tiene resultado previo ({result['estado']}).")
+    waiting = load_waiting_list() if not repost else []
+    validation_items = build_validation_items(bundle, run_invoices, waiting) if not repost else []
+
+    if repost:
+        steps = build_repost_steps(bundle, repost_folios)
+        log(f"Modo repost: {len(steps)} factura(s) por procesar.")
+        if not steps:
+            return
+    else:
+        log(f"Paquete cargado: {bundle.directory.name}")
+        log(f"Facturas nuevas de esta corrida: {len(run_invoices)}.")
+        log(f"Facturas en lista de espera: {len(waiting)}.")
+        for record in waiting:
+            log(f"[{record['folio']}] En lista de espera (motivo: {record['motivo_espera']}).")
+        if not run_invoices and not waiting:
+            log("No hay facturas nuevas ni en lista de espera; no se abrió Edge.")
+            return
+
+    if not repost:
+        for invoice in bundle.data.get("facturas", []):
+            folio = str(invoice.get("folio", "")).strip()
+            result = invoice.get("validacion_lucy") or {}
+            if invoice.get("lista_para_bot") and not result.get("estado"):
+                for part in invoice.get("partes", []):
+                    log(
+                        f"[{folio}] Detectada: vendor={part.get('vendor')}, "
+                        f"tienda={part.get('tienda')}, CECO={part.get('ceco')}, "
+                        f"base={part.get('base')}, IVA={part.get('iva')}, "
+                        f"importe={part.get('importe')}, soporte="
+                        f"{Path(part['archivo_factura']).name if part.get('archivo_factura') else 'no disponible'}."
+                    )
+            elif not invoice.get("lista_para_bot"):
+                log(f"[{folio}] Omitida: no está marcada como lista para Lucy.")
+            elif result.get("estado"):
+                log(f"[{folio}] Omitida: ya tiene resultado previo ({result['estado']}).")
 
     session = BotSession(
         playwright=playwright,
@@ -84,19 +98,22 @@ def run(
         headless=headless,
     )
     log("Configuración cargada; se iniciará Microsoft Edge y el acceso a Lucy.")
-    failures = []
+    failures: list[str] = []
     try:
-        log(f"VALIDATION: {len(validation_items)} factura(s) por buscar.")
-        duplicated_keys: set[str] = set()
-        run_phase(session, build_validation_steps(validation_items, duplicated_keys), failures)
+        if repost:
+            run_phase(session, steps, failures)
+        else:
+            log(f"VALIDATION: {len(validation_items)} factura(s) por buscar.")
+            duplicated_keys: set[str] = set()
+            run_phase(session, build_validation_steps(validation_items, duplicated_keys), failures)
 
-        export_items = build_export_items(bundle, run_invoices, load_waiting_list(), duplicated_keys)
-        log(
-            f"INTERACTIVE EXPORT: {len(export_items)} factura(s) por buscar "
-            f"({len(duplicated_keys)} duplicada(s) en Validation excluida(s))."
-        )
-        run_phase(session, build_export_steps(export_items), failures)
-        log(f"Corrida terminada. Quedan {len(load_waiting_list())} factura(s) en lista de espera.")
+            export_items = build_export_items(bundle, run_invoices, load_waiting_list(), duplicated_keys)
+            log(
+                f"INTERACTIVE EXPORT: {len(export_items)} factura(s) por buscar "
+                f"({len(duplicated_keys)} duplicada(s) en Validation excluida(s))."
+            )
+            run_phase(session, build_export_steps(export_items), failures)
+            log(f"Corrida terminada. Quedan {len(load_waiting_list())} factura(s) en lista de espera.")
     finally:
         if keep_open:
             input("Revisa el resultado en el navegador y presiona Enter para cerrarlo...")
@@ -114,6 +131,8 @@ def run(
 def main(
     headless: bool = False,
     bundle_path: Optional[str] = None,
+    repost: bool = False,
+    repost_folios: Optional[list[str]] = None,
     keep_open: bool = False,
     hold_open: bool = False,
     finish_event: Optional[Event] = None,
@@ -123,14 +142,17 @@ def main(
     log(f"Buscando el paquete más reciente en {bundle_dir}.")
     bundle = load_bundle(bundle_dir, Path(bundle_path) if bundle_path else None)
     log(f"JSON de control cargado: {bundle.json_path.name}.")
-    pending_history = load_waiting_list()
-    log(f"Facturas en lista de espera de corridas anteriores: {len(pending_history)}.")
+    if not repost:
+        pending_history = load_waiting_list()
+        log(f"Facturas en lista de espera de corridas anteriores: {len(pending_history)}.")
     try:
         with sync_playwright() as playwright:
             run(
                 playwright,
                 bundle,
                 headless=headless,
+                repost_folios=repost_folios,
+                repost=repost,
                 keep_open=keep_open,
                 hold_open=hold_open,
                 finish_event=finish_event,
@@ -141,4 +163,17 @@ def main(
 
 
 if __name__ == "__main__":
-    main(bundle_path=sys.argv[1] if len(sys.argv) > 1 else None, keep_open=True)
+    # Uso: bot_lucy.py [zip] [--repost [FOLIO ...]]
+    args = sys.argv[1:]
+    repost_mode = "--repost" in args
+    if repost_mode:
+        index = args.index("--repost")
+        args, folio_args = args[:index], args[index + 1:]
+    else:
+        folio_args = []
+    main(
+        bundle_path=args[0] if args else None,
+        repost=repost_mode,
+        repost_folios=folio_args or None,
+        keep_open=not repost_mode,
+    )

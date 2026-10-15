@@ -240,6 +240,15 @@ class BotLucyWaitingListTests(unittest.TestCase):
             mark_interactive_export(self.bundle, self.invoice, EXPORT_NOT_COMPLETED, 1)
             self.assertNotIn("resumen_allocated_cost", self.invoice[INTERACTIVE_EXPORT_RESULT_KEY])
 
+    def test_repost_result_is_saved_in_control_json(self):
+        from lucy.bundle import REPOST_RESULT_KEY, mark_repost
+
+        with mock.patch("lucy.bundle.save_bundle") as save:
+            mark_repost(self.bundle, self.invoice, "Repost completed")
+
+        self.assertEqual(self.invoice[REPOST_RESULT_KEY]["estado"], "Repost completed")
+        save.assert_called_once_with(self.bundle)
+
 
 class ExportDocumentRulesTests(unittest.TestCase):
     def test_only_fail_or_error_notifications_are_errors(self):

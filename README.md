@@ -31,6 +31,19 @@ when using the installed Microsoft Edge channel. The standalone executable
 build bundles Playwright, but Microsoft Edge must still be installed on the
 target machine.
 
+The multi-vendor repost flow is a separate, opt-in CLI mode and does not replace
+the two-phase waiting-list workflow:
+
+```powershell
+python bot-process\bot_lucy.py [path\to\bundle.zip] --repost [FOLIO ...]
+```
+
+Without folios, it selects multi-vendor invoices that do not have a completed
+repost; providing folios selects those invoices explicitly. The flow is guarded
+by `REPOST_DRY_RUN = True` in `bot-process/lucy/config.py`: it checks the Lucy
+screens and controls without archiving or reposting documents or uploading CSVs.
+Only disable dry-run deliberately when an actual repost is intended.
+
 When launched from the results screen, Bot Lucy streams its progress into the
 execution log panel. After reviewing a document, it leaves Edge open and waits
 for the user to choose **Cerrar Edge y finalizar**. The bot currently verifies

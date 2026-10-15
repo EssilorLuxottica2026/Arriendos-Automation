@@ -23,6 +23,12 @@ SESSION_CHECK_TIMEOUT_MS = 3_000
 FILTER_TIMEOUT_MS = 15_000
 MAX_STEP_ATTEMPTS = 2
 
+# Flujo de repost (multi-vendor). Con REPOST_DRY_RUN activo NO se pulsan Litigation Archive,
+# Reverse - Repost ni Repost: solo se verifica que existan y se continúa con el flujo.
+REPOST_DRY_RUN = True
+REPOST_VERIFY_ATTEMPTS = 3
+REPOST_VERIFY_WAIT_MS = 3_000
+
 
 @dataclass
 class Credentials:

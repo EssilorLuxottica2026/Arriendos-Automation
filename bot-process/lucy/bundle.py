@@ -16,6 +16,8 @@ from typing import Optional
 from .config import BUNDLE_JSON_NAME, BUNDLE_PATTERN, CACHE_DIR
 
 LUCY_RESULT_KEY = "validacion_lucy"
+REPOST_RESULT_KEY = "repost_lucy"
+REPOST_COMPLETED = "Repost completed"
 INTERACTIVE_EXPORT_RESULT_KEY = "interactive_export_lucy"
 
 
@@ -126,6 +128,19 @@ def mark_invoice(bundle: InvoiceBundle, invoice: dict, status: str, matches: int
     invoice[LUCY_RESULT_KEY] = {
         "estado": status,
         "coincidencias": matches,
+        "fecha": datetime.now(timezone.utc).isoformat(),
+    }
+    save_bundle(bundle)
+
+
+def has_completed_repost(invoice: dict) -> bool:
+    return (invoice.get(REPOST_RESULT_KEY) or {}).get("estado") == REPOST_COMPLETED
+
+
+def mark_repost(bundle: InvoiceBundle, invoice: dict, status: str, detail: str = "") -> None:
+    invoice[REPOST_RESULT_KEY] = {
+        "estado": status,
+        "detalle": detail,
         "fecha": datetime.now(timezone.utc).isoformat(),
     }
     save_bundle(bundle)
