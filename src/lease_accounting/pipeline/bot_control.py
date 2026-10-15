@@ -5,6 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def _number(value) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if number != number else number
+
+
 def write_bot_control(
     output_dir: Path,
     postings: list[dict],
@@ -37,6 +45,7 @@ def write_bot_control(
             "fecha_actualizacion": processed_at,
             "error": None,
             "pasos_confirmados": ["preparacion_completada"],
+            "distribucion_porcentajes": False,
             "partes": [],
         })
         raw_vendor = posting.get("vendor")
@@ -67,6 +76,7 @@ def write_bot_control(
 
         part = {
             "parte": posting["posting_index"],
+            "porcentaje_distribucion": posting.get("support_split_percent"),
             "vendor": vendor or None,
             "tienda": posting.get("store"),
             "ceco": posting.get("ceco"),
@@ -92,15 +102,27 @@ def write_bot_control(
             "compensacion_sap": None,
         }
         invoice["partes"].append(part)
+        if _number(posting.get("support_split_percent")) is not None:
+            invoice["distribucion_porcentajes"] = True
 
     for invoice in invoices.values():
         errors = list(dict.fromkeys(preparation_errors.get(invoice["folio"], [])))
         if errors:
             invoice["estado"] = "pendiente_revision"
-        if len(invoice["vendors"]) == 1:
+        if invoice.get("distribucion_porcentajes"):
+            invoice["ruta"] = "multivendor"
+            if len(invoice["vendors"]) == 1:
+                invoice["vendor"] = invoice["vendors"][0]
+            invoice["estado"] = "pendiente_ruta"
+            errors.append(
+                "Factura distribuida por porcentajes en varias partes (ruta multivendor); "
+                "la ruta multivendor aun no esta habilitada para el bot."
+            )
+        elif len(invoice["vendors"]) == 1:
             invoice["vendor"] = invoice["vendors"][0]
             invoice["ruta"] = "single_vendor"
         else:
+            invoice["ruta"] = "multivendor"
             invoice["estado"] = "pendiente_ruta"
             errors.append("La ruta single_vendor requiere exactamente un vendor; multivendor no esta habilitada.")
         if any(part["archivo_factura"] is None for part in invoice["partes"]):

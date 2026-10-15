@@ -6,4 +6,5 @@ xlrd>=2.0.1
 pypdf>=5.0.0
 holidays>=0.58
 pywebview>=6.2
+playwright>=1.50.0
 pyinstaller==6.19.0

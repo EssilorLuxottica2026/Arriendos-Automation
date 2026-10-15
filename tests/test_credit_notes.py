@@ -108,7 +108,8 @@ class CreditNoteTests(unittest.TestCase):
         self.assertEqual(keys_by_type["invoice_item"], "50")
         self.assertEqual(keys_by_type["discount"], "40")
         self.assertEqual(keys_by_type["vat_vw"], "50")
-        self.assertEqual(keys_by_type["vat_vq"], "40")
+        self.assertNotIn("vat_vq", keys_by_type)
+        self.assertEqual(keys_by_type["vat_vq_reversal"], "40")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,102 @@ python app.py
 
 Then open `http://127.0.0.1:5000`.
 
+Bot Lucy uses the installed Microsoft Edge Stable browser through Playwright's
+`msedge` channel. Microsoft Edge must be installed on the machine that runs the
+bot; Playwright and PyInstaller do not bundle Edge itself.
+
+For a standalone Windows build:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m PyInstaller --clean --noconfirm ArriendosAutomation.spec
+```
+
+The app's Python environment also runs Bot Lucy, so install the root
+`requirements.txt` there. No `playwright install` browser download is needed
+when using the installed Microsoft Edge channel. The standalone executable
+build bundles Playwright, but Microsoft Edge must still be installed on the
+target machine.
+
+The multi-vendor repost flow is a separate, opt-in CLI mode and does not replace
+the two-phase waiting-list workflow:
+
+```powershell
+python bot-process\bot_lucy.py [path\to\bundle.zip] --repost [FOLIO ...]
+```
+
+Without folios, it selects multi-vendor invoices that do not have a completed
+repost; providing folios selects those invoices explicitly. The flow is guarded
+by `REPOST_DRY_RUN = True` in `bot-process/lucy/config.py`: it checks the Lucy
+screens and controls without archiving or reposting documents or uploading CSVs.
+Only disable dry-run deliberately when an actual repost is intended.
+
+When launched from the results screen, Bot Lucy streams its progress into the
+execution log panel. After reviewing a document, it leaves Edge open and waits
+for the user to choose **Cerrar Edge y finalizar**. The bot currently verifies
+the document fields but does not click **Save Document**; logs and the local
+control JSON explicitly report that the invoice was not saved.
+
+The bot keeps a persistent waiting list in
+`%LOCALAPPDATA%\Arriendos\bot-process\history\validation_history.json`, with
+each invoice's control data and copies of its Allocated Costs CSVs. Each run has
+two phases:
+
+1. **Validation (Invoice Management)** searches new invoices plus waiting
+   invoices with reason `no_reflejada` or `error_validacion`. An invoice is
+   added to the waiting list only when it is found and its review completes
+   (`validada`) or fails (`error_validacion`). Not-found and duplicated
+   invoices are not added here; duplicates are removed from the list for
+   manual review.
+2. **INTERACTIVE EXPORT** filters by `LUCY_COMPANY_CODE`, clicks
+   **Search Documents**, and searches every invoice of the run plus every
+   waiting invoice (deduplicated by folio and vendor, excluding Validation
+   duplicates) by Invoice Number, checking exact matches across all pages.
+   - One match: the bot enters the invoice (click + double-click), selects
+     movement type FI and checks vendor code, document type, date and
+     document number against the control JSON. Then it sets
+     **Document Type Sap** = `KR - Registro de Factura no PO`, reads
+     **Total VAT Amount** to choose **Vat Code** (`> 0` →
+     `VQ - IVA Compra Servicios 19% - Gasto`; `0` →
+     `VW - IVA Descontable Compras Bienes y Servicios 19%`) and sets
+     **Payment Terms** = `_ - _`. After checking every field again it clicks
+     **Export** → **Import csv template**, uploads the part-1 Allocated Costs
+     CSV (from the run bundle or the archived waiting-list copy) and waits for
+     `Balance:0`. Before touching Lucy the CSV is checked against the control
+     JSON: S/H 40/50, positive amounts, 10-digit GL accounts, Vat Code, CeCo and
+     store equal to the part, a concept in every text, net of the lines (40 − 50)
+     equal to the base, and every 50 line offsetting a deductible-VAT `VW` line
+     on the same account (deductible VAT may not exceed the invoice VAT). After
+     `Balance:0` it checks that every CSV line appears in the Lucy grid with
+     the same S/H, amount, Vat Code, account, CeCo and text, and that
+     **Invoice Total Amount**, **Total Taxable Amount** and **Total VAT
+     Amount** match the control. The Allocated Cost summary
+     (`CostiRipartiti`) is always built from the CSV lines, with every concept
+     once: `MM-YYYY SIGLA1/SIGLA2 TIENDA CECO` (for example
+     `10-2026 INTERES/RV T004 6554`). If Lucy already has a value it must contain
+     all concepts and none repeated; if empty it is filled. The result is saved
+     in the extracted control JSON under `interactive_export_lucy.resumen_allocated_cost`
+     (`resumen`, `conceptos`, `origen`: `completado` or `ya_existia`). Finally it re-checks
+     `Balance:0` and Lucy errors. **Save Document is never clicked.** On success the invoice
+     leaves the waiting list as `completada_interactive_export`.
+   - No match: a waiting invoice stays in the list; an invoice not seen in
+     Validation is added as `no_reflejada` and retried in both phases later.
+   - Multiple matches: nothing is opened; it leaves the list as
+     `duplicada_revision_manual`.
+   - Found but could not be completed (open, field checks, selections, CSV
+     import or Allocated Costs review failed): stays (or is added as
+     `error_interactive_export`) and is retried in Interactive Export.
+
+Lucy's own notifications (`[data-testid="notification"]`) are captured while
+an invoice is open, in both phases. A notification of type `fail` or `error`
+stops that invoice and its text is saved as the error in the waiting list; any
+other notification is only logged. If a step fails for another reason (for
+example a timeout), any Lucy error message is appended to the saved error.
+
+Results are also written to `validacion_lucy` and `interactive_export_lucy`
+in the extracted control JSON of the current run.
+
 ## Required uploads
 
 - Invoices file: `.xlsx`, `.xls`, or `.csv`
@@ -57,11 +153,19 @@ macro database. Generic vendor rules must have no store or CECO: a percentage
 assigned to another location must not override the current location. VW and VQ
 are taken from the same rule (missing VQ is calculated as `1 - VW`), and the
 selected source is recorded in the execution log.
-For partial proration, the posting lines retain the nondeductible VAT remainder
-(`VAT_VQ`) with posting key `50` and `VQ`. They also use the rounded deductible
-VAT amount twice: posting key `40` with `VW`, and an additional posting key `50`
-with `VQ` for the same amount (`vat_vq_reversal`). The additional reversal does
-not replace the nondeductible VAT line.
+For partial proration, the posting lines use the rounded deductible VAT amount
+twice: posting key `40` with `VW`, and posting key `50` with `VQ` for the same
+amount (`vat_vq_reversal`). The nondeductible VAT remainder (`VAT_VQ`) is not
+exported as a separate posting line. This applies to all Allocated Costs CSVs,
+manual-style invoice CSVs and the allocations stored in the bot JSON.
+VAT totals and proration amounts remain available for invoice validation and
+traceability; the invoice total is unchanged. Credit notes invert the posting
+keys as usual.
+Both VAT adjustment lines inherit the concept abbreviation and text of the
+expense line with the largest absolute amount, rather than the invoice's
+generic RF/RV concept or the VAT account abbreviation. Equal amounts use the
+first expense line in source order. Invoices without item lines retain their
+expense line's original concept and text.
 Full VW or full VQ proration keeps the existing behavior without separate VAT
 adjustment lines.
 
@@ -112,7 +216,13 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
 - `ruta`, `estado`, `lista_para_bot`, `documento_sap`, UTC processing/update
   dates, `error`, and `pasos_confirmados`.
 - `partes`: each posting's vendor, store (`tienda`), CeCo, profit center, base,
-  VAT, amount, currency, invoice date, and document type.
+  VAT, amount, currency, invoice date, and document type. Parts from an XML
+  uploaded as "XML para 2/3 tiendas" also carry `porcentaje_distribucion`
+  (for example `33.33`); it is `null` for invoices that are not split. The same
+  percentage is written right after the period in every line text
+  (`10-2026 33.33% RV T004 6554`); long concepts are shortened so the store and
+  CeCo always fit in the 50-character limit. Bot Lucy treats `MM-YYYY NN%` as
+  the period when reading concepts and building the Allocated Cost summary.
 - Each part links its copied support (`archivo_factura`), original source path,
   header CSV, Allocated Costs CSV, and manual-style invoice CSV.
   `allocated_costs` also contains the exact exported rows, without the internal
@@ -121,10 +231,12 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
   `copia_lucy`, and `compensacion_sap`. Unknown values remain JSON `null`;
   preparation never confirms a Lucy copy, SAP posting, or compensation.
 
-Only `single_vendor` is enabled. A folio with several postings for the same vendor
-keeps separate parts and CSVs. Folios distributed across multiple vendors retain
-their existing accounting exports but have `ruta: null`,
-`estado: "pendiente_ruta"`, and `lista_para_bot: false`. Missing invoice supports
+Only `single_vendor` is enabled for the bot. A folio with several postings for the
+same vendor keeps separate parts and CSVs. Folios distributed across multiple
+vendors, and folios uploaded as "XML para 2/3 tiendas" (percentage split, marked
+with `distribucion_porcentajes: true`), use `ruta: "multivendor"`, keep their
+existing accounting exports, and have `estado: "pendiente_ruta"` and
+`lista_para_bot: false` until the multivendor route is enabled. Missing invoice supports
 are reported as `pendiente_archivo`, also preventing bot execution.
 `preparada` confirms only the preparation step, not execution by the bot.
 

@@ -172,6 +172,27 @@ class BotControlTests(unittest.TestCase):
                     self.assertIsNone(part["compensacion_sap"])
             self.assertEqual(len(list((self.pipeline.output_dir / "soportes_facturas").iterdir())), 2)
 
+    def test_percentage_split_invoice_uses_multivendor_route(self):
+        _, payload = self.generate([
+            self.posting(amount=60, support_split_factor=2, support_split_index=1, support_split_percent=60.0),
+            self.posting(amount=40, support_split_factor=2, support_split_index=2, support_split_percent=40.0),
+            self.posting(invoice_id="F2", amount=250, support_split_factor=1, support_split_index=1),
+        ])
+        split, normal = payload["facturas"]
+        self.assertEqual(split["ruta"], "multivendor")
+        self.assertTrue(split["distribucion_porcentajes"])
+        self.assertEqual(split["vendor"], "205766")
+        self.assertEqual(split["estado"], "pendiente_ruta")
+        self.assertFalse(split["lista_para_bot"])
+        self.assertIn("multivendor", split["error"])
+        self.assertEqual(
+            [part["porcentaje_distribucion"] for part in split["partes"]], [60.0, 40.0]
+        )
+        self.assertEqual(normal["ruta"], "single_vendor")
+        self.assertFalse(normal["distribucion_porcentajes"])
+        self.assertTrue(normal["lista_para_bot"])
+        self.assertEqual(payload["rutas_habilitadas"], ["single_vendor"])
+
     def test_multivendor_and_missing_support_are_not_ready(self):
         result, payload = self.generate([
             self.posting(vendor="111"),
@@ -180,7 +201,8 @@ class BotControlTests(unittest.TestCase):
         ])
         multi, missing = payload["facturas"]
         self.assertEqual(multi["vendors"], ["111", "222"])
-        self.assertIsNone(multi["ruta"])
+        self.assertEqual(multi["ruta"], "multivendor")
+        self.assertFalse(multi["distribucion_porcentajes"])
         self.assertEqual(multi["estado"], "pendiente_ruta")
         self.assertFalse(multi["lista_para_bot"])
         self.assertIn("multivendor", multi["error"])

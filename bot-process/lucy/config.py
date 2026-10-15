@@ -10,7 +10,11 @@ from pathlib import Path
 
 BOT_DIR = Path(__file__).resolve().parent.parent
 ENV_FILES = (BOT_DIR / ".env", BOT_DIR.parent / ".env")
-CACHE_DIR = BOT_DIR / "cache"
+LOCAL_APP_DATA_DIR = Path(
+    os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
+)
+CACHE_DIR = LOCAL_APP_DATA_DIR / "Arriendos" / "bot-process" / "cache"
+HISTORY_DIR = LOCAL_APP_DATA_DIR / "Arriendos" / "bot-process" / "history"
 DEFAULT_BUNDLE_DIR = Path.home() / "Downloads"
 BUNDLE_PATTERN = "bot_single_vendor_*.zip"
 BUNDLE_JSON_NAME = "control_facturas_bot.json"

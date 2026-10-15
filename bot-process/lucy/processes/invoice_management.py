@@ -4,10 +4,12 @@ import re
 from playwright.sync_api import Error as PlaywrightError, Page, expect
 
 from ..config import get_company_code
+from ..logging import log
 from ..login import app_menu_link
 
 
 def open_invoice_management(page: Page) -> None:
+    log("Abriendo Invoice Management.")
     link = app_menu_link(page)
     expect(link).to_be_visible()
     link.click()
@@ -23,6 +25,7 @@ def company_code_input(page: Page):
 
 
 def enter_company_code(page: Page, company_code: str) -> None:
+    log(f"Seleccionando la compañía configurada: {company_code}.")
     field = company_code_input(page)
     expect(field).to_be_visible()
     field.fill(company_code)
@@ -34,6 +37,7 @@ def wait_for_company_selected(page: Page, company_code: str) -> None:
 
 
 def search_documents(page: Page) -> None:
+    log("Solicitando la lista de documentos para la compañía.")
     button = page.get_by_role("button", name="Search Documents")
     expect(button).to_be_visible()
     button.click()
@@ -48,6 +52,7 @@ def is_document_detail_open(page: Page) -> bool:
 
 
 def back_to_list(page: Page) -> None:
+    log("Regresando al listado de documentos.")
     button = page.get_by_role("button", name="Back to List")
     expect(button).to_be_visible()
     button.click()
@@ -77,11 +82,13 @@ def show_search_form(page: Page) -> None:
     try:
         company.wait_for(state="visible", timeout=5_000)
     except PlaywrightError:
+        log("El formulario de búsqueda no está visible; solicitando New Search.")
         page.get_by_role("button", name="New Search").click()
         expect(company).to_be_visible()
 
 
 def search_company_documents(page: Page) -> None:
+    log("Preparando búsqueda de documentos por compañía.")
     open_invoice_management(page)
     show_search_form(page)
     company_code = get_company_code()
@@ -89,3 +96,4 @@ def search_company_documents(page: Page) -> None:
     wait_for_company_selected(page, company_code)
     search_documents(page)
     wait_for_document_list(page)
+    log("Listado de documentos cargado.")

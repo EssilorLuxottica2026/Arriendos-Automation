@@ -1,14 +1,16 @@
 """Bundle del bot: ZIP generado por la app con el JSON de control y los CSV.
 
-El ZIP se busca en la carpeta de descargas y se extrae a ``bot-process/cache/<nombre del zip>/``.
-La copia en caché es la copia de trabajo: ahí se guarda el resultado de cada factura, de modo
-que si el bot se interrumpe, la siguiente ejecución continúa con las facturas pendientes.
+El ZIP se busca en la carpeta de descargas y se extrae a la caché local del usuario, bajo
+``%LOCALAPPDATA%/Arriendos/bot-process/cache/<nombre del zip>/``. Cada ejecución borra la caché
+anterior y extrae el ZIP desde cero (puede haber varias corridas al día). Ahí se guarda el
+resultado de cada factura y se conserva hasta la siguiente ejecución.
 """
 import json
+import shutil
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Optional
 
 from .config import BUNDLE_JSON_NAME, BUNDLE_PATTERN, CACHE_DIR
@@ -16,6 +18,7 @@ from .config import BUNDLE_JSON_NAME, BUNDLE_PATTERN, CACHE_DIR
 LUCY_RESULT_KEY = "validacion_lucy"
 REPOST_RESULT_KEY = "repost_lucy"
 REPOST_COMPLETED = "Repost completed"
+INTERACTIVE_EXPORT_RESULT_KEY = "interactive_export_lucy"
 
 
 @dataclass
@@ -32,12 +35,16 @@ def find_latest_bundle(source_dir: Path) -> Path:
     return bundles[-1]
 
 
+def clear_cache(cache_dir: Path = CACHE_DIR) -> None:
+    """Borra las corridas anteriores: cada ejecución del bot empieza con una caché limpia."""
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+
+
 def extract_bundle(zip_path: Path, cache_dir: Path = CACHE_DIR) -> Path:
-    """Extrae el ZIP a la caché; si ya estaba extraído se reutiliza para conservar el avance."""
+    clear_cache(cache_dir)
     target = cache_dir / zip_path.stem
-    if (target / BUNDLE_JSON_NAME).is_file():
-        return target
-    target.mkdir(parents=True, exist_ok=True)
+    target.mkdir(parents=True)
     with zipfile.ZipFile(zip_path) as bundle:
         for member in bundle.namelist():
             destination = (target / member).resolve()
@@ -78,6 +85,29 @@ def get_folio(invoice: dict) -> str:
     return str(invoice["folio"]).strip()
 
 
+def allocated_costs_relative_path(part: dict) -> Optional[str]:
+    """Ruta relativa del CSV Allocated Costs de una parte.
+
+    En el JSON de control la ruta está en ``csv.allocated_costs``; ``allocated_costs`` a nivel de
+    parte es la lista de filas del CSV, no una ruta.
+    """
+    path = (part.get("csv") or {}).get("allocated_costs")
+    if isinstance(path, str) and path.strip():
+        # El JSON se genera en Windows con "\"; se normaliza para cualquier sistema.
+        return PureWindowsPath(path.strip()).as_posix()
+    return None
+
+
+def bundle_allocated_costs_csv(bundle: InvoiceBundle, part: dict) -> Optional[Path]:
+    relative_path = allocated_costs_relative_path(part)
+    if relative_path is None:
+        return None
+    source = (bundle.directory / relative_path).resolve()
+    if not source.is_relative_to(bundle.directory.resolve()):
+        raise ValueError(f"Ruta CSV fuera del paquete de control: {relative_path}.")
+    return source
+
+
 def is_ready_for_bot(invoice: dict) -> bool:
     return bool(invoice.get("lista_para_bot"))
 
@@ -113,4 +143,22 @@ def mark_repost(bundle: InvoiceBundle, invoice: dict, status: str, detail: str =
         "detalle": detail,
         "fecha": datetime.now(timezone.utc).isoformat(),
     }
+    save_bundle(bundle)
+
+
+def mark_interactive_export(
+    bundle: InvoiceBundle,
+    invoice: dict,
+    status: str,
+    matches: int,
+    allocated_cost_summary: Optional[dict] = None,
+) -> None:
+    result = {
+        "estado": status,
+        "coincidencias": matches,
+        "fecha": datetime.now(timezone.utc).isoformat(),
+    }
+    if allocated_cost_summary:
+        result["resumen_allocated_cost"] = allocated_cost_summary
+    invoice[INTERACTIVE_EXPORT_RESULT_KEY] = result
     save_bundle(bundle)

@@ -5,6 +5,7 @@ import re
 import unicodedata
 import zipfile
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 import holidays
@@ -1243,9 +1244,15 @@ class LeaseAccountingPipeline:
             rent_type if self._is_office_store(store) else self._resolve_account_concept(account, rent_type)
             for account, rent_type, store in zip(df["account"], df["rent_type"], df["store"])
         ]
+        for column, default in [("support_split_factor", 1), ("support_split_percent", None)]:
+            if column not in df.columns:
+                df[column] = default
+        split_labels = [self._split_percent_label(row) for _, row in df.iterrows()]
         df["text"] = [
-            self._build_text(date_value, concept, store, ceco)
-            for date_value, concept, store, ceco in zip(period_dates, df["concept"], df["mapped_store"], df["mapped_ceco"])
+            self._build_text(date_value, concept, store, ceco, split_label)
+            for date_value, concept, store, ceco, split_label in zip(
+                period_dates, df["concept"], df["mapped_store"], df["mapped_ceco"], split_labels
+            )
         ]
 
         self._log(f"Evaluated business rules for {len(df)} invoices:")
@@ -1305,6 +1312,7 @@ class LeaseAccountingPipeline:
                 "support_source_path",
                 "support_split_factor",
                 "support_split_index",
+                "support_split_percent",
                 "contract_status_blocked",
                 "support_flags",
             ]
@@ -2958,6 +2966,11 @@ class LeaseAccountingPipeline:
             summary_df["support_split_index"] = summary_df["posting_index"]
         if "support_split_factor" not in summary_df.columns:
             summary_df["support_split_factor"] = summary_df["posting_count"]
+        if "support_split_percent" not in summary_df.columns:
+            summary_df["support_split_percent"] = None
+        summary_df["support_split_percent"] = [
+            self._split_percent_value(row) for _, row in summary_df.iterrows()
+        ]
         summary_df["is_credit_note"] = (
             summary_df.get("ubl_document_type", pd.Series(index=summary_df.index, dtype=object))
             .fillna("Invoice")
@@ -2998,6 +3011,7 @@ class LeaseAccountingPipeline:
                 "posting_count",
                 "support_split_index",
                 "support_split_factor",
+                "support_split_percent",
                 "invoice_date",
                 "document_type",
                 "movement_type",
@@ -3032,6 +3046,7 @@ class LeaseAccountingPipeline:
                 "posting_count": row["posting_count"],
                 "support_split_index": row.get("support_split_index"),
                 "support_split_factor": row.get("support_split_factor"),
+                "support_split_percent": row.get("support_split_percent"),
                 "invoice_date": row["invoice_date"],
                 "store": row["store"],
                 "ceco": row["ceco"],
@@ -3048,7 +3063,9 @@ class LeaseAccountingPipeline:
                 if pd.isna(item_amount) or abs(float(item_amount)) == 0:
                     continue
                 item_concept, item_account = self._item_line_classification(item, row)
-                item_text = self._build_text(row["invoice_date"], item_concept, row["store"], row["ceco"])
+                item_text = self._build_text(
+                    row["invoice_date"], item_concept, row["store"], row["ceco"], self._split_percent_label(row)
+                )
                 credit_note = bool(row.get("is_credit_note", False))
                 item_amount = -abs(float(item_amount)) if credit_note else abs(float(item_amount))
                 item_rows.append(
@@ -3094,6 +3111,7 @@ class LeaseAccountingPipeline:
                     "INCENTIVO GC",
                     row["store"],
                     row["ceco"],
+                    self._split_percent_label(row),
                 )
                 for expense_row, allocated_discount in zip(expense_rows, allocations):
                     if allocated_discount <= 0:
@@ -3114,40 +3132,31 @@ class LeaseAccountingPipeline:
             if self._is_full_vw_prorate(row.get("vw_percent")) or self._is_full_vq_prorate(row.get("vq_percent")):
                 continue
 
+            principal_expense = max(expense_rows, key=lambda expense: abs(float(expense["amount"])))
+            vat_context = {
+                **base,
+                "concept": principal_expense["concept"],
+                "text": principal_expense["text"],
+            }
             if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
                 line_rows.append(
                     {
-                        **base,
+                        **vat_context,
                         "line_type": "vat_vw",
                         "posting_key": "40",
                         "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
                         "tax_code": "VW",
                         "amount": row["vat_vw"],
                     }
                 )
 
-            if pd.notna(row["vat_vq"]) and abs(float(row["vat_vq"])) > 0:
-                line_rows.append(
-                    {
-                        **base,
-                        "line_type": "vat_vq",
-                        "posting_key": "50",
-                        "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
-                        "tax_code": "VQ",
-                        "amount": row["vat_vq"],
-                    }
-                )
-
             if pd.notna(row["vat_vw"]) and abs(float(row["vat_vw"])) > 0:
                 line_rows.append(
                     {
-                        **base,
+                        **vat_context,
                         "line_type": "vat_vq_reversal",
                         "posting_key": "50",
                         "account": self.VAT_ACCOUNT,
-                        "concept": row["concept"],
                         "tax_code": "VQ",
                         "amount": row["vat_vw"],
                     }
@@ -3163,6 +3172,7 @@ class LeaseAccountingPipeline:
                     "posting_count",
                     "support_split_index",
                     "support_split_factor",
+                    "support_split_percent",
                     "invoice_date",
                     "store",
                     "ceco",
@@ -3221,6 +3231,7 @@ class LeaseAccountingPipeline:
             "posting_count",
             "support_split_index",
             "support_split_factor",
+            "support_split_percent",
             "invoice_total",
             "vat_status",
             "ubl_document_type",
@@ -4170,13 +4181,38 @@ class LeaseAccountingPipeline:
         concept = re.sub(r"\s+", " ", concept).strip()
         return concept[:45] if concept else "ITEM"
 
-    def _build_text(self, period_date, rent_type, store, ceco) -> str:
-        month_year = pd.to_datetime(period_date).strftime("%m-%Y") if pd.notna(period_date) else "00-0000"
-        return self._limit_text(f"{month_year} {rent_type or 'RV'} {store or 'NO_STORE'} {ceco or 'NO_CECO'}")
+    def _split_percent_value(self, row) -> float | None:
+        factor = pd.to_numeric(pd.Series([row.get("support_split_factor")]), errors="coerce").iloc[0]
+        percent = pd.to_numeric(pd.Series([row.get("support_split_percent")]), errors="coerce").iloc[0]
+        if pd.isna(factor) or int(factor) <= 1 or pd.isna(percent):
+            return None
+        return float(Decimal(str(float(percent))).quantize(Decimal("0.01")))
 
-    def _limit_text(self, value: str) -> str:
+    def _split_percent_label(self, row) -> str | None:
+        value = self._split_percent_value(row)
+        if value is None:
+            return None
+        return f"{format(Decimal(str(value)).normalize(), 'f')}%"
+
+    def _build_text(self, period_date, rent_type, store, ceco, split_percent: str | None = None) -> str:
+        month_year = pd.to_datetime(period_date).strftime("%m-%Y") if pd.notna(period_date) else "00-0000"
+        concept = rent_type or "RV"
+        tail = f"{store or 'NO_STORE'} {ceco or 'NO_CECO'}"
+        if not split_percent:
+            return self._limit_text(f"{month_year} {concept} {tail}")
+
+        # The split percentage goes right after the period; trim the concept, never the store/CeCo.
+        prefix = f"{month_year} {split_percent}"
+        tail = re.sub(r"\s+", " ", tail).strip()
+        room = self.TEXT_MAX_LENGTH - len(prefix) - len(tail) - 2
+        if room <= 0:
+            return self._limit_text(f"{prefix} {concept} {tail}")
+        return f"{prefix} {self._limit_text(concept, room)} {tail}"
+
+    def _limit_text(self, value: str, max_length: int | None = None) -> str:
+        max_length = self.TEXT_MAX_LENGTH if max_length is None else max_length
         text = re.sub(r"\s+", " ", str(value or "")).strip()
-        if len(text) <= self.TEXT_MAX_LENGTH:
+        if len(text) <= max_length:
             return text
 
         words = text.split()
@@ -4184,13 +4220,13 @@ class LeaseAccountingPipeline:
         current = ""
         for word in words:
             candidate = f"{current} {word}".strip()
-            if len(candidate) > self.TEXT_MAX_LENGTH:
+            if len(candidate) > max_length:
                 break
             compacted.append(word)
             current = candidate
         if compacted:
             return " ".join(compacted)
-        return text[: self.TEXT_MAX_LENGTH].rstrip()
+        return text[:max_length].rstrip()
 
     def _is_active_contract_status(self, value) -> bool:
         status = self._concept_key(value)

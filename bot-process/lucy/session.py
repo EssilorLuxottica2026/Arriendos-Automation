@@ -5,15 +5,22 @@ from playwright.sync_api import Page
 
 from .browser import BotSession, is_page_open, reopen_page
 from .config import MAX_STEP_ATTEMPTS
+from .logging import log
 from .login import is_logged_in, login
 
 
 def ensure_session(session: BotSession) -> Page:
     """Garantiza pantalla abierta y sesión iniciada; devuelve la página lista."""
     if not is_page_open(session):
+        log("Sesión de navegador no disponible; abriendo Microsoft Edge.")
         reopen_page(session)
+    else:
+        log("Microsoft Edge y la pestaña de Lucy están disponibles.")
     if not is_logged_in(session.page):
+        log("Sesión de Lucy no iniciada; comenzando autenticación.")
         login(session.page, session.credentials, session.login_url)
+    else:
+        log("Sesión de Lucy activa.")
     return session.page
 
 
@@ -31,4 +38,4 @@ def run_step(session: BotSession, name: str, step: Callable[[Page], None]) -> No
         except Exception as exc:  # noqa: BLE001 - expect/timeout también pueden deberse a la sesión
             if attempt == MAX_STEP_ATTEMPTS or is_session_alive(session):
                 raise
-            print(f"[{name}] Pantalla/sesión perdida ({type(exc).__name__}); reintentando...")
+            log(f"[{name}] Pantalla/sesión perdida ({type(exc).__name__}); reintentando.")
