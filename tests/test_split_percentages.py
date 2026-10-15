@@ -81,6 +81,36 @@ class SplitPercentageTests(unittest.TestCase):
         )
         self.assertEqual(result["total"].sum(), 100)
 
+    def test_split_assigns_vendor_to_each_part(self):
+        pipeline = LeaseAccountingPipeline("scratch")
+        invoices = pd.DataFrame(
+            [
+                {
+                    "invoice_id": "PRUEBA-MV",
+                    "support_split_factor": 3,
+                    "support_split_weights": ["33.33", "33.33", "33.34"],
+                    "support_split_vendors": ["111", "222", "333"],
+                    "support_split_compensation": "999",
+                    "total": 100,
+                    "amount": 100,
+                    "invoice_line_items": [],
+                    "invoice_discounts": [],
+                }
+            ]
+        )
+
+        result = pipeline._expand_split_invoice_rows(invoices)
+
+        self.assertEqual(result["support_split_vendor"].tolist(), ["111", "222", "333"])
+        self.assertEqual(result["support_split_compensation"].tolist(), ["999"] * 3)
+
+    def test_split_vendors_are_ignored_for_unsplit_invoices(self):
+        self.assertEqual(LeaseAccountingPipeline._valid_split_vendors(["111"], 1), [None])
+        self.assertEqual(LeaseAccountingPipeline._valid_split_vendors(None, 2), [None, None])
+        self.assertEqual(
+            LeaseAccountingPipeline._valid_split_vendors([" 111 ", ""], 2), ["111", None]
+        )
+
     def test_split_percentage_is_written_after_period_in_text(self):
         pipeline = LeaseAccountingPipeline("scratch")
         row = {"support_split_factor": 3, "support_split_percent": 33.330000000000005}

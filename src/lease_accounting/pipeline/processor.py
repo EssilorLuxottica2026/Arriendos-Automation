@@ -490,6 +490,8 @@ class LeaseAccountingPipeline:
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
         support_split_weights: dict[str, list[str | float]] | None = None,
+        support_split_vendors: dict[str, list[str]] | None = None,
+        support_split_compensations: dict[str, str] | None = None,
         macro_template_path: Path | None = None,
         period: str | None = None,
         contract_selections: dict[str, str] | None = None,
@@ -515,6 +517,8 @@ class LeaseAccountingPipeline:
             support_paths=support_paths,
             support_split_factors=support_split_factors,
             support_split_weights=support_split_weights,
+            support_split_vendors=support_split_vendors,
+            support_split_compensations=support_split_compensations,
             macro_template_path=macro_template_path,
             period=period,
             contract_selections=contract_selections,
@@ -539,6 +543,8 @@ class LeaseAccountingPipeline:
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
         support_split_weights: dict[str, list[str | float]] | None = None,
+        support_split_vendors: dict[str, list[str]] | None = None,
+        support_split_compensations: dict[str, str] | None = None,
         macro_template_path: Path | None = None,
         period: str | None = None,
         contract_selections: dict[str, str] | None = None,
@@ -570,6 +576,8 @@ class LeaseAccountingPipeline:
             support_paths=support_paths,
             support_split_factors=support_split_factors,
             support_split_weights=support_split_weights,
+            support_split_vendors=support_split_vendors,
+            support_split_compensations=support_split_compensations,
             macro_template_path=macro_template_path,
         )
         data = self.clean_data(data, beneficiary_selections=beneficiary_selections or {})
@@ -593,6 +601,8 @@ class LeaseAccountingPipeline:
         support_paths: list[Path] | None = None,
         support_split_factors: dict[str, int] | None = None,
         support_split_weights: dict[str, list[str | float]] | None = None,
+        support_split_vendors: dict[str, list[str]] | None = None,
+        support_split_compensations: dict[str, str] | None = None,
         macro_template_path: Path | None = None,
     ) -> dict[str, pd.DataFrame]:
         self._log("Loading input files.")
@@ -607,6 +617,8 @@ class LeaseAccountingPipeline:
                 support_paths or [],
                 support_split_factors=support_split_factors,
                 support_split_weights=support_split_weights,
+                support_split_vendors=support_split_vendors,
+                support_split_compensations=support_split_compensations,
             ),
             "macro_database": self._load_macro_database(macro_template_path) if macro_template_path else pd.DataFrame(),
         }
@@ -634,6 +646,8 @@ class LeaseAccountingPipeline:
                     "support_discounts",
                     "split_weights",
                     "support_split_weights",
+                    "split_vendors",
+                    "support_split_vendors",
                     "source_path",
                     "invoice_source_path",
                 }:
@@ -788,6 +802,8 @@ class LeaseAccountingPipeline:
                     "payable_rounding": "support_payable_rounding",
                     "split_factor": "support_split_factor",
                     "split_weights": "support_split_weights",
+                    "split_vendors": "support_split_vendors",
+                    "split_compensation": "support_split_compensation",
                     "flags": "support_flags",
                 }
             )
@@ -812,6 +828,8 @@ class LeaseAccountingPipeline:
                         "support_payable_rounding",
                         "support_split_factor",
                         "support_split_weights",
+                        "support_split_vendors",
+                        "support_split_compensation",
                         "support_flags",
                     ]
                 ],
@@ -1244,7 +1262,12 @@ class LeaseAccountingPipeline:
             rent_type if self._is_office_store(store) else self._resolve_account_concept(account, rent_type)
             for account, rent_type, store in zip(df["account"], df["rent_type"], df["store"])
         ]
-        for column, default in [("support_split_factor", 1), ("support_split_percent", None)]:
+        for column, default in [
+            ("support_split_factor", 1),
+            ("support_split_percent", None),
+            ("support_split_vendor", None),
+            ("support_split_compensation", None),
+        ]:
             if column not in df.columns:
                 df[column] = default
         split_labels = [self._split_percent_label(row) for _, row in df.iterrows()]
@@ -1313,6 +1336,8 @@ class LeaseAccountingPipeline:
                 "support_split_factor",
                 "support_split_index",
                 "support_split_percent",
+                "support_split_vendor",
+                "support_split_compensation",
                 "contract_status_blocked",
                 "support_flags",
             ]
@@ -1493,6 +1518,8 @@ class LeaseAccountingPipeline:
         support_paths: list[Path],
         support_split_factors: dict[str, int] | None = None,
         support_split_weights: dict[str, list[str | float]] | None = None,
+        support_split_vendors: dict[str, list[str]] | None = None,
+        support_split_compensations: dict[str, str] | None = None,
     ) -> pd.DataFrame:
         if not support_paths:
             return pd.DataFrame()
@@ -1514,6 +1541,22 @@ class LeaseAccountingPipeline:
             ),
             axis=1,
         )
+        split_vendors_by_name = {
+            Path(path).name: vendors
+            for path, vendors in (support_split_vendors or {}).items()
+        }
+        split_compensation_by_name = {
+            Path(path).name: vendor
+            for path, vendor in (support_split_compensations or {}).items()
+        }
+        df["split_vendors"] = [
+            self._valid_split_vendors(split_vendors_by_name.get(name), int(factor))
+            for name, factor in zip(df["source_file"], df["split_factor"])
+        ]
+        df["split_compensation"] = [
+            (str(split_compensation_by_name.get(name) or "").strip() or None) if int(factor) > 1 else None
+            for name, factor in zip(df["source_file"], df["split_factor"])
+        ]
         for _, row in df.iterrows():
             split_note = ""
             if int(row.get("split_factor") or 1) > 1:
@@ -1536,11 +1579,20 @@ class LeaseAccountingPipeline:
             return [1.0] * split_factor
         return parsed.astype(float).tolist()
 
+    @staticmethod
+    def _valid_split_vendors(vendors, split_factor: int) -> list[str | None]:
+        if split_factor <= 1 or not isinstance(vendors, (list, tuple)) or len(vendors) != split_factor:
+            return [None] * split_factor
+        return [str(vendor).strip() or None if vendor is not None else None for vendor in vendors]
+
     def _apply_support_split_factors(self, supports: pd.DataFrame) -> pd.DataFrame:
         df = supports.copy()
         if "split_factor" not in df.columns:
             df["split_factor"] = 1
         df["split_factor"] = pd.to_numeric(df["split_factor"], errors="coerce").fillna(1).clip(lower=1).astype(int)
+        for column in ["split_weights", "split_vendors", "split_compensation"]:
+            if column not in df.columns:
+                df[column] = None
         return df
 
     def _split_invoice_line_items(self, line_items, split_factor: int) -> list[list[dict]]:
@@ -1590,6 +1642,10 @@ class LeaseAccountingPipeline:
                 row.get("support_split_weights"),
                 split_factor,
             )
+            split_vendors = self._valid_split_vendors(
+                row.get("support_split_vendors"),
+                split_factor,
+            )
             residual_index = split_factor - 1
             monetary_allocations = {}
             for col in [
@@ -1629,6 +1685,7 @@ class LeaseAccountingPipeline:
                 new_row["support_split_percent"] = (
                     float(split_weights[split_index - 1]) / sum(split_weights) * 100
                 )
+                new_row["support_split_vendor"] = split_vendors[split_index - 1]
                 for col, values in monetary_allocations.items():
                     new_row[col] = values[split_index - 1]
                 new_row["invoice_line_items"] = split_items[split_index - 1]
@@ -3242,7 +3299,8 @@ class LeaseAccountingPipeline:
         ]
         summary_columns.extend(
             column for column in [
-                "lucy_id", "barcode", "support_source_path", "contract_status_blocked"
+                "lucy_id", "barcode", "support_source_path", "contract_status_blocked",
+                "support_split_vendor", "support_split_compensation",
             ] if column in summary_df.columns
         )
         summary_df = summary_df[summary_columns].copy()

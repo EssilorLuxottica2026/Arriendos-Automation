@@ -31,6 +31,9 @@ class SplitReviewWebTests(unittest.TestCase):
                     "item_count": "1",
                     "percentage_0_0": "60",
                     "percentage_0_1": "40",
+                    "vendor_0_0": "111",
+                    "vendor_0_1": " 222 ",
+                    "compensation_vendor_0": "999",
                 },
             )
 
@@ -40,6 +43,36 @@ class SplitReviewWebTests(unittest.TestCase):
             saved_jobs[-1]["support_split_weights"]["C:/uploads/FACTURA-1.xml"],
             ["60", "40"],
         )
+        self.assertEqual(
+            saved_jobs[-1]["support_split_vendors"]["C:/uploads/FACTURA-1.xml"],
+            ["111", "222"],
+        )
+        self.assertEqual(
+            saved_jobs[-1]["support_split_compensations"]["C:/uploads/FACTURA-1.xml"],
+            "999",
+        )
+
+    def test_rejects_missing_part_vendor_or_compensation(self):
+        for missing in ["vendor_0_1", "compensation_vendor_0"]:
+            data = {
+                "item_count": "1",
+                "percentage_0_0": "60",
+                "percentage_0_1": "40",
+                "vendor_0_0": "111",
+                "vendor_0_1": "222",
+                "compensation_vendor_0": "999",
+            }
+            data[missing] = " "
+            with (
+                patch("lease_accounting.web._load_review_job", return_value=dict(self.job)),
+                patch("lease_accounting.web._save_review_job"),
+                patch("lease_accounting.web._continue_processing_job") as continue_job,
+                patch("lease_accounting.web._render_split_review", return_value="REVIEW_AGAIN"),
+            ):
+                response = self.client.post("/split-review/test-batch", data=data)
+
+            self.assertEqual(response.get_data(as_text=True), "REVIEW_AGAIN")
+            continue_job.assert_not_called()
 
     def test_rejects_percentages_that_do_not_sum_to_100(self):
         with (

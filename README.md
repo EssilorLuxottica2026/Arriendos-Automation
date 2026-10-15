@@ -210,6 +210,12 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
   (`10-2026 33.33% RV T004 6554`); long concepts are shortened so the store and
   CeCo always fit in the 50-character limit. Bot Lucy treats `MM-YYYY NN%` as
   the period when reading concepts and building the Allocated Cost summary.
+- For "XML para 2/3 tiendas" folios the split review screen requires a vendor
+  for every percentage part and a "Vendor a compensar". Each part's `vendor`
+  is the one typed for that percentage (parts may go to different vendors, and
+  `vendors` lists them), and the folio-level `compensacion` stores the vendor to
+  compensate for the future SAP master invoice. `compensacion` is `null` for
+  folios that are not split. The accounting CSVs keep the Excel vendor.
 - Each part links its copied support (`archivo_factura`), original source path,
   header CSV, Allocated Costs CSV, and manual-style invoice CSV.
   `allocated_costs` also contains the exact exported rows, without the internal
@@ -218,10 +224,12 @@ The versioned JSON contains a `facturas` list with one entry per processed folio
   `copia_lucy`, and `compensacion_sap`. Unknown values remain JSON `null`;
   preparation never confirms a Lucy copy, SAP posting, or compensation.
 
-Only `single_vendor` is enabled. A folio with several postings for the same vendor
-keeps separate parts and CSVs. Folios distributed across multiple vendors retain
-their existing accounting exports but have `ruta: null`,
-`estado: "pendiente_ruta"`, and `lista_para_bot: false`. Missing invoice supports
+Only `single_vendor` is enabled for the bot. A folio with several postings for the
+same vendor keeps separate parts and CSVs. Folios distributed across multiple
+vendors, and folios uploaded as "XML para 2/3 tiendas" (percentage split, marked
+with `distribucion_porcentajes: true`), use `ruta: "multivendor"`, keep their
+existing accounting exports, and have `estado: "pendiente_ruta"` and
+`lista_para_bot: false` until the multivendor route is enabled. Missing invoice supports
 are reported as `pendiente_archivo`, also preventing bot execution.
 `preparada` confirms only the preparation step, not execution by the bot.
 
