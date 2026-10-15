@@ -243,6 +243,8 @@ def _run_pipeline_from_job(job: dict) -> dict:
         support_paths=[Path(path) for path in job.get("support_paths", [])],
         support_split_factors=job.get("support_split_factors") or None,
         support_split_weights=job.get("support_split_weights") or None,
+        support_split_vendors=job.get("support_split_vendors") or None,
+        support_split_compensations=job.get("support_split_compensations") or None,
         macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
@@ -418,6 +420,8 @@ def _prepare_pipeline_from_job(job: dict):
         support_paths=[Path(path) for path in job.get("support_paths", [])],
         support_split_factors=job.get("support_split_factors") or None,
         support_split_weights=job.get("support_split_weights") or None,
+        support_split_vendors=job.get("support_split_vendors") or None,
+        support_split_compensations=job.get("support_split_compensations") or None,
         macro_template_path=Path(job["macro_template_path"]) if job.get("macro_template_path") else None,
         period=job.get("period") or None,
         contract_selections=job.get("contract_selections") or None,
@@ -796,6 +800,8 @@ def process():
             "support_paths": [str(path) for path in support_paths],
             "support_split_factors": support_split_factors,
             "support_split_weights": {},
+            "support_split_vendors": {},
+            "support_split_compensations": {},
             "macro_template_path": str(macro_workbook_path) if macro_workbook_path else None,
             "period": period or None,
             "manual_processing_files": manual_processing_files,
@@ -852,6 +858,8 @@ def split_review(batch_id: str):
             raise PipelineError("La revision de porcentajes no coincide con las facturas cargadas.")
 
         split_weights = {}
+        split_vendors = {}
+        split_compensations = {}
         for idx, (support_path, raw_factor) in enumerate(split_factors.items()):
             split_factor = max(int(raw_factor or 1), 1)
             percentages = []
@@ -878,7 +886,25 @@ def split_review(batch_id: str):
                 )
             split_weights[support_path] = [format(value, "f") for value in percentages]
 
+            vendors = [
+                request.form.get(f"vendor_{idx}_{part_index}", "").strip()
+                for part_index in range(split_factor)
+            ]
+            if not all(vendors):
+                raise PipelineError(
+                    f"Escribe el vendor de cada parte de {Path(support_path).name}."
+                )
+            compensation_vendor = request.form.get(f"compensation_vendor_{idx}", "").strip()
+            if not compensation_vendor:
+                raise PipelineError(
+                    f"Escribe el vendor a compensar de {Path(support_path).name}."
+                )
+            split_vendors[support_path] = vendors
+            split_compensations[support_path] = compensation_vendor
+
         job["support_split_weights"] = split_weights
+        job["support_split_vendors"] = split_vendors
+        job["support_split_compensations"] = split_compensations
         _save_review_job(batch_id, job)
         return _continue_processing_job(batch_id, job)
     except PipelineError as exc:

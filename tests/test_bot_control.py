@@ -193,6 +193,27 @@ class BotControlTests(unittest.TestCase):
         self.assertTrue(normal["lista_para_bot"])
         self.assertEqual(payload["rutas_habilitadas"], ["single_vendor"])
 
+    def test_percentage_split_stores_part_vendors_and_compensation(self):
+        _, payload = self.generate([
+            self.posting(
+                amount=60, support_split_factor=2, support_split_index=1, support_split_percent=60.0,
+                support_split_vendor="111", support_split_compensation="999",
+            ),
+            self.posting(
+                amount=40, support_split_factor=2, support_split_index=2, support_split_percent=40.0,
+                support_split_vendor="222", support_split_compensation="999",
+            ),
+            self.posting(invoice_id="F2", amount=250, support_split_factor=1, support_split_index=1),
+        ])
+        split, normal = payload["facturas"]
+        self.assertEqual(split["ruta"], "multivendor")
+        self.assertEqual(split["compensacion"], "999")
+        self.assertEqual([part["vendor"] for part in split["partes"]], ["111", "222"])
+        self.assertEqual(split["vendors"], ["111", "222"])
+        self.assertIsNone(split["vendor"])
+        self.assertIsNone(normal["compensacion"])
+        self.assertEqual(normal["partes"][0]["vendor"], "205766")
+
     def test_multivendor_and_missing_support_are_not_ready(self):
         result, payload = self.generate([
             self.posting(vendor="111"),

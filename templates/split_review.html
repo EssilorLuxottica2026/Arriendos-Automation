@@ -122,6 +122,7 @@
                                         placeholder="Vendor archivo {{ part_index + 1 }}"
                                         aria-label="Vendor del archivo {{ part_index + 1 }}"
                                         autocomplete="off"
+                                        required
                                     >
                                 </label>
                             {% endfor %}
@@ -136,6 +137,7 @@
                                 placeholder="Vendor al que se compensa la factura"
                                 aria-label="Vendor a compensar de la factura {{ item.invoice_id }}"
                                 autocomplete="off"
+                                required
                             >
                         </label>
 

@@ -46,12 +46,16 @@ def write_bot_control(
             "error": None,
             "pasos_confirmados": ["preparacion_completada"],
             "distribucion_porcentajes": False,
+            "compensacion": None,
             "partes": [],
         })
-        raw_vendor = posting.get("vendor")
+        raw_vendor = posting.get("support_split_vendor") or posting.get("vendor")
         vendor = str(raw_vendor).strip() if raw_vendor is not None else None
         if vendor and vendor not in invoice["vendors"]:
             invoice["vendors"].append(vendor)
+        compensation = str(posting.get("support_split_compensation") or "").strip()
+        if compensation and not invoice["compensacion"]:
+            invoice["compensacion"] = compensation
         if posting.get("invoice_total") is None:
             raise ValueError(f"La factura {invoice_id} no tiene un importe confirmado.")
         for relative_path in posting["archivos_csv"].values():
