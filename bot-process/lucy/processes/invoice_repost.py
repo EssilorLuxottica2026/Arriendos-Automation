@@ -1,13 +1,12 @@
 """Proceso: repost de facturas multi-vendor (una copia en Lucy por cada vendor de la factura).
 
 Flujo: Interactive Export -> Litigation Archive -> Reverse (Repost x N vendors) ->
-Interactive Export (verificar N facturas) -> actualizar cada una con los datos del JSON ->
+Interactive Export (verificar N facturas) -> completar cada copia con su CSV (ver invoice_parts) ->
 validar que el botón Export (SAP) exista (nunca se pulsa).
 
 Con ``REPOST_DRY_RUN`` activo no se pulsan Litigation Archive, Reverse - Repost ni Repost:
 solo se valida que existan y se continúa con el siguiente paso.
 """
-from pathlib import Path
 from typing import Callable, Optional
 
 from playwright.sync_api import Error as PlaywrightError, Locator, Page, expect
@@ -32,7 +31,6 @@ from .invoice_validation import (
     DETAIL_LOAD_TIMEOUT_MS,
     OPEN_ATTEMPTS,
     ROW_SELECT_WAIT_MS,
-    VENDOR_CODE_LENGTH,
     back_to_list_button,
     column_filter,
     filter_by_column,
@@ -47,7 +45,6 @@ REPOST_ERROR = "Repost error"
 
 INTERACTIVE_EXPORT = "INTERACTIVE EXPORT"
 REVERSE = "REVERSE"
-CSV_KEY = "allocated_costs"
 
 Location = tuple[int, int]
 Step = tuple[str, Callable[[Page], None]]
@@ -200,69 +197,25 @@ def verify_reposts(page: Page, barcode: str, expected: int) -> None:
     )
 
 
-def labeled_input(page: Page, label: str) -> Locator:
-    # Input que sigue a la etiqueta visible (evita depender de ids o nth-child).
-    return page.get_by_text(label, exact=True).first.locator("xpath=following::input[1]")
-
-
-def fill_and_check(field: Locator, value: str) -> None:
-    field.fill(value)
-    expect(field).to_have_value(value)
-
-
-def resolve_csv_path(bundle: InvoiceBundle, part: dict) -> Path:
-    relative_path = (part.get("csv") or {}).get(CSV_KEY)
-    if not relative_path:
-        raise RepostError(f"La parte {part.get('parte')} no tiene CSV {CSV_KEY}.")
-    path = bundle.directory / relative_path
-    if not path.is_file():
-        raise RepostError(f"No existe el CSV de la parte {part.get('parte')}: {path}")
-    return path
-
-
-def update_document(page: Page, bundle: InvoiceBundle, part: dict) -> None:
-    csv_path = resolve_csv_path(bundle, part)
-    expect(page.get_by_role("main")).to_contain_text("Vendor Code")
-    fill_and_check(labeled_input(page, "Vendor Code"), str(part["vendor"]).strip().zfill(VENDOR_CODE_LENGTH))
-    # TODO: el JSON no trae el Vendor Name; falta definir de dónde sale para llenarlo y validarlo.
-    amount = page.locator("[class*='NumberInput__StyledInput']").first
-    fill_and_check(amount, str(part["importe"]))
-    file_input = page.locator("input[type='file']")
-    expect(file_input).to_have_count(1)
-    if REPOST_DRY_RUN:
-        print(f"[Repost] DRY-RUN: input de CSV existe; no se carga {csv_path.name}.")
-    else:
-        file_input.set_input_files(str(csv_path))
-
-
-def update_documents(page: Page, bundle: InvoiceBundle, invoice: dict, barcode: str) -> None:
-    for index, part in enumerate(invoice["partes"]):
-        matches = list_barcode_matches(page, barcode)
-        if index >= len(matches):
-            if not REPOST_DRY_RUN:
-                raise RepostError(f"No hay documento para la parte {part.get('parte')} del barcode {barcode}.")
-            print(f"[Repost {barcode}] DRY-RUN: no existe el repost de la parte {part.get('parte')}; se omite.")
-            continue
-        open_document(page, barcode, matches[index])
-        update_document(page, bundle, part)
-        back_to_list(page)
-
-
 def verify_export_button(page: Page) -> None:
     # No se exporta a SAP: solo se valida que el botón exista.
     expect_button_exists(page, "Export", exact=True)
 
 
 def run_repost(page: Page, bundle: InvoiceBundle, invoice: dict) -> None:
+    # Import local: invoice_parts importa los helpers de este módulo.
+    from .invoice_parts import preflight_parts, process_parts
+
     barcode = get_barcode(invoice)
     vendor_count = get_vendor_count(invoice)
+    preflight_parts(bundle, invoice)
     location = find_single_invoice(page, barcode)
     litigation_archive(page, barcode, location)
     repost_documents(page, barcode, vendor_count)
     search_company_in_interactive_export(page)
     # Litigation Archive elimina la original: tras los reposts deben quedar tantas facturas como vendors.
     verify_reposts(page, barcode, 1 if REPOST_DRY_RUN else vendor_count)
-    update_documents(page, bundle, invoice, barcode)
+    process_parts(page, bundle, invoice, barcode)
     verify_export_button(page)
 
 
